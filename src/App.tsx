@@ -1,0 +1,1026 @@
+import { useState, useEffect, useRef } from 'react';
+import Webcam from 'react-webcam';
+import { Hands, Results } from '@mediapipe/hands';
+import * as drawingUtils from '@mediapipe/drawing_utils';
+import { 
+  Camera, 
+  MessageSquare, 
+  Trash2, 
+  ChevronRight, 
+  BookOpen, 
+  Play, 
+  ArrowLeft,
+  Hand,
+  Info,
+  Zap,
+  Shield,
+  Sparkles,
+  Eye,
+  RotateCcw,
+  Space,
+  Settings,
+  Plus,
+  PlayCircle,
+  StopCircle,
+  Brain
+} from 'lucide-react';
+import { detectHandSign } from './utils/signLogic';
+import * as mlEngine from './utils/mlEngine';
+
+type Page = 'home' | 'guide' | 'detector-letter' | 'detector-word';
+
+const HAND_CONNECTIONS: [number, number][] = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+
+const SIGN_DATA = [
+  { char: 'A', emoji: '✊', img: '/signs/a.png', desc: 'Kepalkan tangan, jempol di samping', fingers: 'Semua tertutup rapat', color: 'from-cyan-500/20 to-blue-500/20', border: 'hover:border-cyan-500/50' },
+  { char: 'B', emoji: '🖐️', img: '/signs/b.png', desc: 'Tangan lurus tegak', fingers: '4 jari lurus, jempol dilipat', color: 'from-purple-500/20 to-pink-500/20', border: 'hover:border-purple-500/50' },
+  { char: 'C', emoji: '🗜️', img: '/signs/c.png', desc: 'Melengkung bentuk C', fingers: 'Semua melengkung setengah terbuka', color: 'from-sky-500/20 to-cyan-500/20', border: 'hover:border-sky-500/50' },
+  { char: 'D', emoji: '☝️', img: '/signs/d.png', desc: 'Telunjuk naik, lain membulat', fingers: 'Jempol menyentuh jari tengah', color: 'from-amber-500/20 to-orange-500/20', border: 'hover:border-amber-500/50' },
+  { char: 'E', emoji: '✊', img: '/signs/e.png', desc: 'Kuku menyentuh telapak', fingers: 'Semua ditekuk rapat', color: 'from-rose-500/20 to-red-500/20', border: 'hover:border-rose-500/50' },
+  { char: 'F', emoji: '👌', img: '/signs/f.png', desc: 'Bentuk tanda OK', fingers: 'Jempol & telunjuk nyambung', color: 'from-emerald-500/20 to-cyan-500/20', border: 'hover:border-emerald-500/50' },
+  { char: 'G', emoji: '🤏', img: '/signs/g.png', desc: 'Telunjuk & jempol mendatar', fingers: 'Mencapit secara horizontal', color: 'from-yellow-500/20 to-lime-500/20', border: 'hover:border-yellow-500/50' },
+  { char: 'H', emoji: '✌️', img: '/signs/h.png', desc: 'Telunjuk & tengah mendatar', fingers: 'Dua jari lurus ke samping', color: 'from-orange-500/20 to-red-500/20', border: 'hover:border-orange-500/50' },
+  { char: 'I', emoji: '🤙', img: '/signs/i.png', desc: 'Hanya kelingking naik', fingers: 'Kelingking lurus ke atas', color: 'from-blue-500/20 to-indigo-500/20', border: 'hover:border-blue-500/50' },
+  { char: 'J', emoji: '🪝', img: '/signs/j.png', desc: 'Kelingking melukis J', fingers: 'Gerakan seperti mata kail', color: 'from-violet-500/20 to-purple-500/20', border: 'hover:border-violet-500/50' },
+  { char: 'K', emoji: '✌️', img: '/signs/k.png', desc: 'Bentuk V, jempol di tengah', fingers: 'Telunjuk & tengah terbuka', color: 'from-fuchsia-500/20 to-pink-500/20', border: 'hover:border-fuchsia-500/50' },
+  { char: 'L', emoji: '🤟', img: '/signs/l.png', desc: 'Bentuk pistol huruf L', fingers: 'Jempol direntang ke samping', color: 'from-lime-500/20 to-green-500/20', border: 'hover:border-lime-500/50' },
+  { char: 'M', emoji: '✊', img: '/signs/m.png', desc: 'Jempol diselip di 3 jari', fingers: 'Masuk di bawah telunjuk, tengah, manis', color: 'from-red-500/20 to-rose-500/20', border: 'hover:border-red-500/50' },
+  { char: 'N', emoji: '✊', img: '/signs/n.png', desc: 'Jempol diselip di 2 jari', fingers: 'Masuk di bawah telunjuk & tengah', color: 'from-pink-500/20 to-rose-500/20', border: 'hover:border-pink-500/50' },
+  { char: 'O', emoji: '⭕', img: '/signs/o.png', desc: 'Bentuk lingkaran (teropong)', fingers: 'Jari melengkung nyentuh jempol', color: 'from-amber-500/20 to-yellow-500/20', border: 'hover:border-amber-500/50' },
+  { char: 'P', emoji: '👇', img: '/signs/p.png', desc: 'K terbalik (menghadap bawah)', fingers: 'Jempol di tengah telunjuk & tengah', color: 'from-blue-500/20 to-cyan-500/20', border: 'hover:border-blue-500/50' },
+  { char: 'Q', emoji: '🤏', img: '/signs/q.png', desc: 'G terbalik (menghadap bawah)', fingers: 'Jempol & telunjuk menunjuk bawah', color: 'from-emerald-500/20 to-teal-500/20', border: 'hover:border-emerald-500/50' },
+  { char: 'R', emoji: '🤞', img: '/signs/r.png', desc: 'Telunjuk & tengah menyilang', fingers: 'Jari tengah di atas telunjuk', color: 'from-cyan-500/20 to-blue-500/20', border: 'hover:border-cyan-500/50' },
+  { char: 'S', emoji: '✊', img: '/signs/s.png', desc: 'Kepalan bulat', fingers: 'Jempol menyilang di depan jari', color: 'from-indigo-500/20 to-violet-500/20', border: 'hover:border-indigo-500/50' },
+  { char: 'T', emoji: '✊', img: '/signs/t.png', desc: 'Jempol diselip di 1 jari', fingers: 'Masuk di bawah telunjuk saja', color: 'from-purple-500/20 to-fuchsia-500/20', border: 'hover:border-purple-500/50' },
+  { char: 'U', emoji: '🤞', img: '/signs/u.png', desc: 'Telunjuk & tengah tegak rapat', fingers: 'Nempel tanpa celah', color: 'from-teal-500/20 to-emerald-500/20', border: 'hover:border-teal-500/50' },
+  { char: 'V', emoji: '✌️', img: '/signs/v.png', desc: 'Tanda Peace', fingers: 'Telunjuk & tengah terpisah', color: 'from-pink-500/20 to-rose-500/20', border: 'hover:border-pink-500/50' },
+  { char: 'W', emoji: '🖐️', img: '/signs/w.png', desc: 'Tiga jari tegak', fingers: 'Telunjuk, tengah, manis naik', color: 'from-indigo-500/20 to-purple-500/20', border: 'hover:border-indigo-500/50' },
+  { char: 'X', emoji: '🪝', img: '/signs/x.png', desc: 'Telunjuk melengkung (kait)', fingers: 'Seperti kait bajak laut', color: 'from-rose-500/20 to-red-500/20', border: 'hover:border-rose-500/50' },
+  { char: 'Y', emoji: '🤙', img: '/signs/y.png', desc: 'Mirip menelepon', fingers: 'Kelingking & jempol keluar', color: 'from-cyan-500/20 to-teal-500/20', border: 'hover:border-cyan-500/50' },
+  { char: 'Z', emoji: '⚡', img: '/signs/z.png', desc: 'Telunjuk melukis Z', fingers: 'Menulis Z di udara', color: 'from-yellow-500/20 to-amber-500/20', border: 'hover:border-yellow-500/50' }
+];
+
+function App() {
+  const [currentPage, setCurrentPage] = useState<Page>('home');
+  const webcamRef = useRef<Webcam>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [detectedText, setDetectedText] = useState<string>("");
+  const [currentLetter, setCurrentLetter] = useState<string>("");
+  const [isModelLoading, setIsModelLoading] = useState(true);
+  const [frameCount, setFrameCount] = useState(0);
+  const lastTypedLetterRef = useRef<string>("");
+
+  const navigateTo = (page: Page) => {
+    setCurrentPage(page);
+    let path = '/';
+    if (page === 'guide') path = '/dataset-library';
+    if (page === 'detector-letter') path = '/studio-huruf';
+    if (page === 'detector-word') path = '/studio-kata';
+    
+    if (window.location.pathname !== path) {
+      window.history.pushState({ page }, '', path);
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && e.state.page) {
+        setCurrentPage(e.state.page);
+      } else {
+        const path = window.location.pathname;
+        if (path === '/dataset-library') navigateTo('guide');
+        else if (path === '/studio-huruf') navigateTo('detector-letter');
+        else if (path === '/studio-kata') navigateTo('detector-word');
+        else navigateTo('home');
+      }
+    };
+    
+    // Initial load sync
+    const path = window.location.pathname;
+    if (path === '/dataset-library') navigateTo('guide');
+    else if (path === '/studio-huruf') navigateTo('detector-letter');
+    else if (path === '/studio-kata') navigateTo('detector-word');
+    else navigateTo('home');
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+  
+  // ML Studio States
+  const mlStudioRef = useRef({
+    activeMode: 'letter' as mlEngine.MLMode,
+    isStudioMode: false,
+    isRecording: false,
+    trainingLetter: 'A',
+    useMLMode: false
+  });
+  
+  const [mlState, setMlState] = useState({
+    activeMode: 'letter' as mlEngine.MLMode,
+    isStudioMode: false,
+    isRecording: false,
+    trainingLetter: 'A',
+    useMLMode: false,
+    sampleCounts: {} as Record<string, number>,
+    isDropdownOpen: false,
+    customLabels: [] as string[],
+    isAddingCustom: false,
+    newCustomValue: "",
+    isAutoTraining: false,
+    autoTrainProgress: 0
+  });
+
+  const updateMlState = (updates: Partial<typeof mlState>) => {
+    mlStudioRef.current = { ...mlStudioRef.current, ...updates };
+    setMlState(prev => ({ ...prev, ...updates }));
+  };
+
+  const updateSampleCounts = (mode: mlEngine.MLMode = mlState.activeMode) => {
+    const counts = mlEngine.getClassCounts(mode);
+    setMlState(prev => ({ ...prev, sampleCounts: counts }));
+  };
+  
+  const handleAutoTrain = async () => {
+    if (mlState.isAutoTraining) return;
+    updateMlState({ isAutoTraining: true, autoTrainProgress: 0 });
+
+    try {
+      // Load compact base poses (14KB) — augmentation happens here in the browser
+      updateMlState({ autoTrainProgress: 5 });
+      const res = await fetch('/asl_base_poses.json');
+      if (!res.ok) throw new Error(`HTTP ${res.status}: asl_base_poses.json not found`);
+      const basePoses: Record<string, number[]> = await res.json();
+
+      const letters = Object.keys(basePoses);
+      let loaded = 0;
+
+      for (const letter of letters) {
+        const flat = basePoses[letter]; // [x0,y0,x1,y1,...,x20,y20]
+        // Convert flat array back to MediaPipe-compatible landmark objects
+        const landmarks: { x: number; y: number; z: number }[] = [];
+        for (let i = 0; i < flat.length; i += 2) {
+          landmarks.push({ x: flat[i], y: flat[i + 1], z: 0 });
+        }
+        // Generate 60 augmented samples from this base pose
+        mlEngine.addAugmentedStaticExamples(landmarks, letter, 'letter', 60);
+        loaded++;
+        updateMlState({ autoTrainProgress: 5 + Math.round((loaded / letters.length) * 90) });
+        // Yield to browser per letter to keep UI responsive
+        await new Promise(r => setTimeout(r, 0));
+      }
+
+      // NOTE: We do NOT save auto-train to localStorage (too large).
+      // Base poses are re-generated from JSON every startup (fast, pure math).
+      // Then reload any user-recorded samples on top.
+      mlEngine.loadDatasetFromStorage('letter');
+      updateSampleCounts('letter');
+      updateMlState({ isAutoTraining: false, autoTrainProgress: 100 });
+    } catch (err) {
+      console.error('AutoTrain failed:', err);
+      updateMlState({ isAutoTraining: false, autoTrainProgress: 0 });
+      alert(`Auto-Training gagal: ${err}`);
+    }
+  };
+
+  const FRAME_THRESHOLD = 15;
+
+  useEffect(() => {
+    // Always run auto-train on startup (re-generates A-Z base poses from JSON, fast).
+    // User-recorded samples are merged back on top after auto-train completes.
+    mlEngine.loadDatasetFromStorage('word');
+    updateSampleCounts();
+    setIsModelLoading(false);
+    handleAutoTrain();
+  }, []);
+
+  useEffect(() => {
+    if (!currentPage.startsWith('detector')) return;
+
+    let isRunning = true;
+    let animationFrameId: number;
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 0, // Diturunkan ke 0 agar lebih ringan dan tidak delay di laptop
+      minDetectionConfidence: 0.7,
+      minTrackingConfidence: 0.7,
+    });
+
+    hands.onResults(onResults);
+
+    const processVideo = async () => {
+      if (!isRunning) return;
+      
+      const video = webcamRef.current?.video;
+      // Pastikan video sudah dirender dan siap
+      if (video && video.readyState === 4) {
+        try {
+          await hands.send({ image: video });
+          setIsModelLoading(false); // Matikan loading setelah model berhasil menerima frame pertama
+        } catch (error) {
+          console.error("Error dalam memproses video:", error);
+        }
+      }
+      
+      // Looping terus-menerus meskipun video awal belum ready (polling)
+      if (isRunning) {
+        animationFrameId = requestAnimationFrame(processVideo);
+      }
+    };
+
+    processVideo(); // Mulai loop
+
+    return () => { 
+      isRunning = false;
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      hands.close(); 
+    };
+  }, [currentPage]);
+
+  const onResults = (results: Results) => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    ctx.save();
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    
+    // Balikkan (mirror) canvas secara horizontal agar sejajar dengan video webcam yang mirrored
+    ctx.translate(canvasRef.current.width, 0);
+    ctx.scale(-1, 1);
+    
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+      const landmarks = results.multiHandLandmarks[0];
+      const handedness = results.multiHandedness[0].label; // "Left" atau "Right"
+
+      drawingUtils.drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: '#06b6d4', lineWidth: 3 });
+      drawingUtils.drawLandmarks(ctx, landmarks, { color: '#a855f7', lineWidth: 1, radius: 3 });
+      
+      const mlParams = mlStudioRef.current;
+      
+      if (mlParams.isStudioMode && mlParams.isRecording) {
+        // Mode Training
+        const features = mlEngine.processLandmarksToFeatures(landmarks);
+        mlEngine.classifiers[mlParams.activeMode].addExample(features, mlParams.trainingLetter);
+        features.dispose();
+      } else if (mlParams.useMLMode && mlEngine.classifiers[mlParams.activeMode].getNumClasses() > 0) {
+        // Mode AI Prediksi
+        const features = mlEngine.processLandmarksToFeatures(landmarks);
+        mlEngine.classifiers[mlParams.activeMode].predictClass(features).then(res => {
+          handleGesture(res.label);
+          features.dispose();
+        }).catch(err => console.error(err));
+      } else {
+        // Mode Heuristik
+        const letter = detectHandSign(landmarks, handedness);
+        handleGesture(letter);
+      }
+    } else {
+      mlEngine.clearTemporalBuffer();
+      setCurrentLetter("");
+      setFrameCount(0);
+    }
+    ctx.restore();
+  };
+
+  const handleGesture = (label: string) => {
+    if (!label) { 
+      setCurrentLetter(""); 
+      setFrameCount(0); 
+      lastTypedLetterRef.current = ""; 
+      return; 
+    }
+
+    setCurrentLetter(prevLetter => {
+      if (prevLetter === label) {
+        if (lastTypedLetterRef.current === label) {
+          // Jika huruf sudah diketik, biarkan progress bar penuh dan jangan ketik ulang
+          setFrameCount(FRAME_THRESHOLD);
+          return prevLetter;
+        }
+
+        setFrameCount(prevCount => {
+          const next = prevCount + 1;
+          if (next >= FRAME_THRESHOLD) { 
+            setDetectedText(prevText => {
+              const isWord = mlStudioRef.current.activeMode === 'word';
+              const hasContent = prevText.trim().length > 0;
+              // Provide padding if it's a word and there's previous text
+              const prefix = (isWord && hasContent && !prevText.endsWith(' ')) ? ' ' : '';
+              const suffix = isWord ? ' ' : '';
+              return prevText + prefix + label + suffix;
+            }); 
+            lastTypedLetterRef.current = label;
+            return FRAME_THRESHOLD; 
+          }
+          return next;
+        });
+        return prevLetter;
+      } else {
+        setFrameCount(1);
+        lastTypedLetterRef.current = "";
+        return label;
+      }
+    });
+  };
+
+  // ===================== LANDING PAGE =====================
+  const LandingPage = () => (
+    <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Background Ornaments specific to Landing */}
+      <div className="absolute top-20 right-10 w-[500px] h-[500px] bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none animate-float-slow" />
+      <div className="absolute bottom-20 left-10 w-[600px] h-[600px] bg-purple-600/10 blur-[150px] rounded-full pointer-events-none animate-float-slow" style={{ animationDelay: '-4s' }} />
+
+      {/* Hero Section */}
+      <div className="pt-20 pb-32 flex flex-col lg:flex-row items-center gap-16 min-h-[85vh]">
+        {/* Left Content */}
+        <div className="flex-1 text-center lg:text-left z-10">
+          <div className="animate-fade-up inline-flex items-center gap-2 px-4 py-2 rounded-full glass border border-cyan-500/30 mb-8 shadow-[0_0_20px_rgba(6,182,212,0.15)]">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="text-xs font-bold text-cyan-300 tracking-wider uppercase">Platform Machine Learning Terbuka</span>
+          </div>
+          
+          <h1 className="animate-fade-up stagger-1 text-6xl sm:text-7xl lg:text-8xl font-black mb-6 leading-[1.05] tracking-tight">
+            <span className="block text-white">Latih AI Anda</span>
+            <span className="block text-gradient-hero">Tanpa Coding</span>
+          </h1>
+          
+          <p className="animate-fade-up stagger-2 text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed font-light">
+            Buat Dataset Bahasa Isyarat Anda sendiri langsung di dalam browser. Rekam 21 titik rangka tangan, latih model AI secara real-time, lalu Export hasilnya (JSON/CSV) untuk project Anda!
+          </p>
+
+          <div className="animate-fade-up stagger-3 flex flex-col sm:flex-row items-center lg:justify-start justify-center gap-5">
+            <button 
+              onClick={() => { navigateTo('detector-letter'); updateMlState({ activeMode: 'letter', trainingLetter: 'A' }); updateSampleCounts('letter'); }}
+              className="group relative w-full sm:w-auto overflow-hidden flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-bold text-lg transition-all transform hover:-translate-y-1 hover:shadow-[0_20px_40px_-10px_rgba(6,182,212,0.4)]"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-600 transition-all group-hover:scale-110 duration-500" />
+              <div className="absolute top-0 left-[-100%] w-[50%] h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[-20deg] group-hover:animate-shimmer" />
+              <span className="relative flex items-center gap-3 text-white">
+                <Play size={22} fill="currentColor" />
+                Mode Huruf
+                <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              </span>
+            </button>
+
+            <button 
+              onClick={() => { navigateTo('detector-word'); updateMlState({ activeMode: 'word', trainingLetter: 'Halo' }); updateSampleCounts('word'); }}
+              className="group relative w-full sm:w-auto overflow-hidden flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-bold text-lg transition-all transform hover:-translate-y-1 hover:shadow-[0_20px_40px_-10px_rgba(168,85,247,0.4)]"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-600 transition-all group-hover:scale-110 duration-500" />
+              <div className="absolute top-0 left-[-100%] w-[50%] h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[-20deg] group-hover:animate-shimmer" />
+              <span className="relative flex items-center gap-3 text-white">
+                <Brain size={22} />
+                Mode Kata
+                <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              </span>
+            </button>
+            
+            <button 
+              onClick={() => navigateTo('guide')}
+              className="group w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-2xl glass hover:bg-white/5 border border-white/10 hover:border-white/20 text-white font-bold text-lg transition-all hover:-translate-y-1"
+            >
+              <BookOpen size={22} className="text-slate-400 group-hover:text-purple-400 transition-colors" />
+              Lihat Dataset
+            </button>
+          </div>
+          
+          {/* Stats/Trust */}
+          <div className="animate-fade-up stagger-4 mt-16 flex items-center justify-center lg:justify-start gap-8 border-t border-white/5 pt-8">
+            <div>
+              <p className="text-3xl font-black text-white">0<span className="text-cyan-500">ms</span></p>
+              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Server Latency</p>
+            </div>
+            <div className="w-px h-12 bg-white/5" />
+            <div>
+              <p className="text-3xl font-black text-white">100<span className="text-purple-500">%</span></p>
+              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Lokal & Privat</p>
+            </div>
+            <div className="w-px h-12 bg-white/5" />
+            <div>
+              <p className="text-3xl font-black text-white">21<span className="text-emerald-500">+</span></p>
+              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mt-1">Titik Sendi</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Visualizer */}
+        <div className="flex-1 relative w-full max-w-lg hidden lg:block animate-float">
+          <div className="relative aspect-square">
+            {/* Holographic glowing orb */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-cyan-500/20 to-purple-600/20 blur-3xl animate-pulse-neon" />
+            
+            {/* Floating UI Elements representing the product */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="relative w-full h-full">
+                {/* Main Glass Card */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-96 glass-strong rounded-3xl border border-white/10 shadow-2xl overflow-hidden backdrop-blur-xl">
+                  <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-cyan-400 to-purple-500" />
+                  <div className="p-6 h-full flex flex-col">
+                    <div className="flex justify-between items-center mb-8">
+                      <div className="flex gap-2">
+                        <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                        <div className="w-3 h-3 rounded-full bg-amber-500/80" />
+                        <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
+                      </div>
+                      <Hand className="text-cyan-400" size={24} />
+                    </div>
+                    {/* Simulated hand skeleton */}
+                    <div className="flex-1 relative flex items-center justify-center">
+                      <div className="absolute w-32 h-32 border border-cyan-500/30 rounded-full animate-ping" style={{ animationDuration: '3s' }} />
+                      <div className="w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjIiIGZpbGw9IiMwNmI2ZDQiLz48Y2lyY2xlIGN4PSI4MCIgY3k9IjgwIiByPSIyIiBmaWxsPSIjMDZiNmQ0Ii8+PGNpcmNsZSBjeD0iMTIwIiBjeT0iODAiIHI9IjIiIGZpbGw9IiMwNmI2ZDQiLz48cGF0aCBkPSJNMTAwIDEwMCBMIDgwIDgwIE0xMDAgMTAwIEwgMTIwIDgwIiBzdHJva2U9IiMwNmI2ZDQiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC41Ii8+PC9zdmc+')] bg-center bg-no-repeat opacity-50" />
+                      <div className="absolute text-5xl font-black text-white shadow-[0_0_30px_rgba(255,255,255,0.5)]">✌️</div>
+                    </div>
+                    <div className="mt-auto pt-4 border-t border-white/5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-xl">V</div>
+                        <div>
+                          <p className="text-xs text-slate-400">Terdeteksi</p>
+                          <p className="text-sm font-bold text-white">Confidence: 98%</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Floating smaller cards */}
+                <div className="absolute -right-12 top-20 w-48 p-4 glass rounded-2xl border border-white/10 shadow-xl animate-float" style={{ animationDelay: '-2s' }}>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-500/20 rounded-lg"><Zap size={16} className="text-emerald-400" /></div>
+                    <p className="text-sm font-bold text-white">60 FPS Processing</p>
+                  </div>
+                </div>
+                
+                <div className="absolute -left-8 bottom-32 w-52 p-4 glass rounded-2xl border border-white/10 shadow-xl animate-float" style={{ animationDelay: '-1s' }}>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-500/20 rounded-lg"><Shield size={16} className="text-purple-400" /></div>
+                    <p className="text-sm font-bold text-white">100% Private</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Feature Cards Showcase */}
+      <div className="pb-24">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-black text-white mb-4">Teknologi <span className="text-gradient-cyan">Mutakhir</span></h2>
+          <p className="text-slate-400">Dirancang untuk kecepatan, akurasi, dan privasi maksimal.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { icon: <Zap size={28} />, title: "Real-time Edge AI", desc: "Berjalan langsung di browser menggunakan WebAssembly dan WebGL tanpa delay server.", gradient: "from-cyan-500 to-blue-600" },
+            { icon: <Shield size={28} />, title: "Privasi Absolut", desc: "Video dari kamera Anda tidak pernah meninggalkan perangkat Anda. 100% aman.", gradient: "from-purple-500 to-pink-600" },
+            { icon: <Sparkles size={28} />, title: "Presisi Tinggi", desc: "Melacak 21 titik sendi pada tangan dengan akurasi tinggi bahkan di kondisi minim cahaya.", gradient: "from-emerald-500 to-cyan-600" },
+          ].map((item, i) => (
+            <div key={i} className={`animate-fade-up stagger-${i+4} holo-card rounded-3xl p-8`}>
+              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.gradient} flex items-center justify-center text-white mb-6 shadow-[0_10px_20px_-10px_rgba(0,0,0,0.5)]`}>
+                {item.icon}
+              </div>
+              <h3 className="text-2xl font-bold mb-3 text-white">{item.title}</h3>
+              <p className="text-slate-400 leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ===================== GUIDE PAGE =====================
+  const GuidePage = () => (
+    <div className="animate-fade-up w-full max-w-7xl mx-auto px-4 pb-20">
+      {/* Hero Banner for Guide */}
+      <div className="relative rounded-[2.5rem] overflow-hidden mb-16 glass-strong border border-white/10">
+        <div className="absolute inset-0 bg-gradient-to-r from-purple-900/40 via-cyan-900/40 to-blue-900/40" />
+        <div className="absolute right-0 top-0 w-1/2 h-full bg-[url('https://images.unsplash.com/photo-1579227114347-15d08fc37cae?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80')] bg-cover bg-center opacity-20 mix-blend-overlay" />
+        <div className="relative p-10 md:p-16 flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="text-left max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 mb-6">
+              <BookOpen size={16} className="text-purple-400" />
+              <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Database</span>
+            </div>
+            <h2 className="text-4xl md:text-6xl font-black text-white mb-4 leading-tight">
+              Dataset <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">Library</span>
+            </h2>
+            <p className="text-lg text-slate-300 leading-relaxed font-light">
+              Referensi bentuk standar yang digunakan untuk mengumpulkan data. Tiru pose ini di dalam AI Studio untuk merekam Dataset berkualitas tinggi.
+            </p>
+          </div>
+          <button onClick={() => navigateTo('home')} className="group flex items-center gap-3 px-6 py-3 rounded-xl glass hover:bg-white/10 transition-all shrink-0">
+            <ArrowLeft size={20} className="text-slate-400 group-hover:text-white transition-colors" />
+            <span className="font-semibold text-slate-300 group-hover:text-white transition-colors">Kembali</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Dictionary Grid - Premium Trading Card Style */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8">
+        {SIGN_DATA.map((item, i) => (
+          <div key={item.char} className={`animate-fade-up stagger-${i+1} holo-card rounded-[2rem] group cursor-pointer`}>
+            {/* Glossy Reflection overlay */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+            
+            <div className="p-1">
+              {/* Inner Card Top - Emoji Showcase */}
+              <div className={`relative aspect-[4/3] rounded-[1.75rem] overflow-hidden bg-gradient-to-br ${item.color} flex flex-col items-center justify-center border border-white/5`}>
+                <div className="absolute inset-0 bg-[#050810]/40 backdrop-blur-[2px]" />
+                
+                {/* Big Background Letter */}
+                <span className="absolute text-9xl font-black text-white/[0.05] -rotate-12 scale-150 select-none">{item.char}</span>
+                
+                {/* 3D-like Image Showcase */}
+                <div className="relative z-10 w-full h-full p-4 transform group-hover:scale-110 transition-all duration-500 ease-out">
+                  <img 
+                    src={item.img} 
+                    alt={`Hand sign for ${item.char}`}
+                    className="w-full h-full object-contain drop-shadow-[0_20px_30px_rgba(0,0,0,0.5)]"
+                    onError={(e) => {
+                      // Fallback to emoji if image is missing
+                      (e.target as any).style.display = 'none';
+                      (e.target as any).nextSibling.style.display = 'block';
+                    }}
+                  />
+                  <div className="hidden text-7xl text-center leading-none select-none drop-shadow-2xl">
+                    {item.emoji}
+                  </div>
+                </div>
+                
+                {/* Neon base shadow */}
+                <div className="absolute bottom-4 w-20 h-4 bg-black/40 blur-md rounded-full transform group-hover:scale-75 transition-transform duration-500" />
+              </div>
+
+              {/* Inner Card Bottom - Text Info */}
+              <div className="p-6">
+                <div className="flex justify-between items-end mb-4">
+                  <h3 className="text-4xl font-black text-white">{item.char}</h3>
+                  <div className="w-8 h-8 rounded-full glass flex items-center justify-center">
+                    <Hand size={14} className="text-slate-400" />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Aksi</p>
+                    <p className="text-sm text-slate-300 font-medium">{item.desc}</p>
+                  </div>
+                  <div className="h-px w-full bg-white/5" />
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Posisi Jari</p>
+                    <p className="text-xs text-slate-400 leading-relaxed">{item.fingers}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bottom CTA to Detector */}
+      <div className="mt-24 text-center relative max-w-3xl mx-auto">
+        <div className="absolute inset-0 bg-cyan-500/10 blur-[80px] rounded-full pointer-events-none" />
+        <div className="relative p-10 rounded-[2.5rem] holo-card flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="flex items-center gap-6 text-left">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+              <Eye size={32} className="text-white" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-white mb-2">Siap untuk mempraktikkan?</h3>
+              <p className="text-slate-400 text-sm">Buka kamera dan sistem AI kami akan menilai gerakan Anda.</p>
+            </div>
+          </div>
+          <button onClick={() => { navigateTo('detector-letter'); updateMlState({ activeMode: 'letter', trainingLetter: 'A' }); updateSampleCounts('letter'); }} className="w-full md:w-auto px-8 py-4 rounded-xl bg-white text-slate-900 font-black hover:scale-105 hover:bg-cyan-50 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+            Coba Detektor
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ===================== DETECTOR PAGE =====================
+  const DetectorPage = (mode: mlEngine.MLMode) => (
+    <div className="animate-scale-in">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigateTo('home')} className="p-3 rounded-2xl glass hover:neon-border transition-all text-slate-400 hover:text-white">
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="text-2xl font-black text-white">Detektor</h1>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+              <span className="text-[11px] text-cyan-400 font-bold uppercase tracking-widest">AI Engine Aktif</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => setDetectedText(prev => prev.slice(0, -1))} className="p-3 rounded-2xl glass hover:neon-border-purple transition-all text-slate-400 hover:text-purple-400" title="Hapus 1 karakter">
+            <RotateCcw size={18} />
+          </button>
+          <button onClick={() => setDetectedText(prev => prev + " ")} className="p-3 rounded-2xl glass hover:neon-border-emerald transition-all text-slate-400 hover:text-emerald-400" title="Spasi">
+            <Space size={18} />
+          </button>
+          <button onClick={() => setDetectedText("")} className="flex items-center gap-2 px-5 py-3 rounded-2xl glass text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-all">
+            <Trash2 size={16} />
+            <span className="text-sm font-bold hidden sm:inline">Hapus Semua</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Camera - 3 cols */}
+        <div className="lg:col-span-3 space-y-4">
+          <div className="relative rounded-[2rem] overflow-hidden bg-[#050810] aspect-video border border-white/5 shadow-2xl animate-glow-breathe">
+            {/* Loading / Auto-Training Overlay */}
+            {(isModelLoading || mlState.isAutoTraining) && (
+              <div className="absolute inset-0 flex items-center justify-center bg-[#050810]/95 backdrop-blur-md z-50">
+                <div className="flex flex-col items-center max-w-xs text-center px-6">
+                  <div className="relative w-20 h-20 mb-8">
+                    <div className="absolute inset-0 border-4 border-cyan-500/10 rounded-full" />
+                    <div className="absolute inset-0 border-4 border-transparent border-t-cyan-500 rounded-full animate-spin" />
+                    <div className="absolute inset-3 border-4 border-transparent border-b-purple-500 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1s' }} />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                       <Sparkles size={24} className="text-cyan-400 animate-pulse" />
+                    </div>
+                  </div>
+                  
+                  <h3 className="text-xl font-black text-white mb-2 tracking-tight">
+                    {mlState.isAutoTraining ? 'Mensinkronkan Otak AI' : 'Memuat Engine'}
+                  </h3>
+                  
+                  <p className="text-sm font-bold text-cyan-400/80 tracking-widest uppercase mb-4">
+                    {mlState.isAutoTraining ? `Proses: ${mlState.autoTrainProgress}%` : 'Sistem Siap...'}
+                  </p>
+                  
+                  {mlState.isAutoTraining && (
+                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                      <div 
+                        className="h-full bg-gradient-to-r from-cyan-500 to-purple-600 transition-all duration-300 shadow-[0_0_10px_rgba(6,182,212,0.5)]"
+                        style={{ width: `${mlState.autoTrainProgress}%` }}
+                      />
+                    </div>
+                  )}
+                  
+                  <p className="text-[10px] text-slate-500 mt-6 leading-relaxed">
+                    {mlState.isAutoTraining 
+                      ? 'AlphaBrain sedang mempelajari koordinat titik tangan dari panduan visual secara otomatis...' 
+                      : 'Mengunduh model deteksi tangan MediaPipe...'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Webcam & Canvas (Only render if NOT auto-training) */}
+            {!mlState.isAutoTraining && (
+              <>
+                <Webcam 
+                  ref={webcamRef} 
+                  className="absolute inset-0 w-full h-full object-cover" 
+                  mirrored 
+                  videoConstraints={{ width: 1280, height: 720, facingMode: "user" }}
+                />
+                <canvas ref={canvasRef} width={1280} height={720} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
+              </>
+            )}
+            
+            {/* Corner decorations */}
+            <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-cyan-500/40 rounded-tl-lg" />
+            <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-cyan-500/40 rounded-tr-lg" />
+            <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-cyan-500/40 rounded-bl-lg" />
+            <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-cyan-500/40 rounded-br-lg" />
+
+            {/* Status Badge */}
+            {!mlState.isAutoTraining && (
+              <div className="absolute top-6 left-6">
+                <div className="px-5 py-2.5 rounded-2xl glass text-xs font-bold flex items-center gap-3">
+                  <div className={`w-2.5 h-2.5 rounded-full ${currentLetter ? 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]' : 'bg-slate-600'}`} />
+                  <span className={currentLetter ? 'text-cyan-300' : 'text-slate-500'}>
+                    {currentLetter ? `TERDETEKSI: ${currentLetter}` : 'MENCARI TANGAN...'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Current Letter Badge */}
+            {!mlState.isAutoTraining && currentLetter && (
+              <div className="absolute bottom-6 right-6">
+                <div className="w-auto min-w-[5rem] h-20 px-6 rounded-2xl glass neon-border flex items-center justify-center animate-letter-pop">
+                  <span className="text-4xl font-black text-cyan-400">{currentLetter}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Scan line overlay */}
+            <div className="absolute inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" style={{ animation: 'scan-line 4s linear infinite' }} />
+          </div>
+          
+          {/* Progress Bar */}
+          {currentLetter && (
+            <div className="relative h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 transition-all duration-100 ease-linear rounded-full"
+                style={{ width: `${(frameCount / FRAME_THRESHOLD) * 100}%` }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Output Panel - 2 cols */}
+        <div className="lg:col-span-2 flex flex-col gap-5">
+          {/* Main Output */}
+          <div className="relative flex-1 p-8 rounded-[2rem] glass-strong overflow-hidden">
+            {/* Decorative gradient */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-3xl rounded-full pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-purple-500/5 blur-3xl rounded-full pointer-events-none" />
+            
+            <div className="relative">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-cyan-500/10">
+                    <MessageSquare size={16} className="text-cyan-400" />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.25em] text-cyan-400">Output</span>
+                </div>
+                {detectedText.length > 0 && (
+                  <span className="text-[10px] font-mono text-slate-600 bg-white/5 px-3 py-1 rounded-lg">
+                    {detectedText.length} chars
+                  </span>
+                )}
+              </div>
+
+              <div className="min-h-[200px] text-5xl md:text-6xl font-black font-mono break-all leading-[1.1] text-white">
+                {detectedText || (
+                  <div className="flex flex-col items-center justify-center h-[200px] text-slate-700">
+                    <div className="w-14 h-14 rounded-2xl border border-dashed border-slate-800 flex items-center justify-center mb-4">
+                      <Camera size={24} />
+                    </div>
+                    <p className="text-sm font-semibold">Menunggu isyarat...</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Tip Card */}
+          <div className="p-5 rounded-2xl glass neon-border-purple">
+            <div className="flex gap-4 items-start">
+              <div className="p-2 rounded-xl bg-purple-500/10 shrink-0">
+                <Info size={16} className="text-purple-400" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-purple-300 mb-1">Tips Akurasi</p>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Gunakan satu tangan, pastikan pencahayaan cukup, dan jaga jarak 30-50cm dari kamera.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* ML Studio / AI Training Card - Moved to TOP priority */}
+          <div className="p-5 rounded-2xl glass border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.1)] order-first">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-purple-500/20">
+                  <Brain size={16} className="text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Dashboard Pelatihan AI</p>
+                  <p className="text-[10px] text-purple-300">Model: {mode === 'word' ? 'Custom Kata' : 'A-Z Huruf'}</p>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer" title="Uji Coba AI Anda">
+                <input type="checkbox" className="sr-only peer" checked={mlState.useMLMode} onChange={(e) => updateMlState({ useMLMode: e.target.checked })} />
+                <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-500"></div>
+              </label>
+            </div>
+
+            {!mlState.useMLMode ? (
+              <div className="space-y-4 animate-fade-up">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative z-50">
+                    <button 
+                      onClick={() => updateMlState({ isDropdownOpen: !mlState.isDropdownOpen })}
+                      className="flex items-center justify-between min-w-[110px] bg-[#0f172a] hover:bg-slate-800 text-white text-xs font-bold rounded-lg px-3 py-2.5 border border-purple-500/30 hover:border-purple-500/60 transition-all shadow-[0_0_10px_rgba(168,85,247,0.1)]"
+                    >
+                      <span>Label: {mlState.trainingLetter}</span>
+                      <ChevronRight size={14} className={`transform transition-transform ${mlState.isDropdownOpen ? 'rotate-90' : ''}`} />
+                    </button>
+                    
+                    {mlState.isDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0" onClick={() => updateMlState({ isDropdownOpen: false, isAddingCustom: false })} />
+                        <div className="absolute top-full mt-2 left-0 w-48 bg-[#0f172a]/95 backdrop-blur-xl border border-purple-500/30 rounded-xl shadow-2xl shadow-purple-500/20 max-h-60 overflow-y-auto z-50 py-2">
+                          {mode === 'letter' && SIGN_DATA.map(s => (
+                            <button
+                              key={s.char}
+                              onClick={() => updateMlState({ trainingLetter: s.char, isDropdownOpen: false, isAddingCustom: false })}
+                              className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors ${
+                                mlState.trainingLetter === s.char 
+                                  ? 'bg-purple-500/20 text-purple-300' 
+                                  : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                              }`}
+                            >
+                              Label: {s.char}
+                            </button>
+                          ))}
+                          
+                          {mode === 'word' && Object.keys(mlState.sampleCounts).map(char => (
+                            <button
+                              key={char}
+                              onClick={() => updateMlState({ trainingLetter: char, isDropdownOpen: false, isAddingCustom: false })}
+                              className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors ${
+                                mlState.trainingLetter === char 
+                                  ? 'bg-purple-500/20 text-purple-300' 
+                                  : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                              }`}
+                            >
+                              Label: {char}
+                            </button>
+                          ))}
+                          
+                          <div className="border-t border-white/10 mt-1 pt-1 px-2">
+                            {mode === 'word' && (
+                              mlState.isAddingCustom ? (
+                                <div className="flex flex-col gap-1">
+                                  <input 
+                                    type="text" 
+                                    autoFocus
+                                    className="w-full bg-slate-900 text-white text-[10px] rounded px-2 py-1.5 border border-purple-500/50 focus:outline-none"
+                                    placeholder="Ketik kata (mis: TOLONG)..."
+                                    value={mlState.newCustomValue}
+                                    onChange={(e) => updateMlState({ newCustomValue: e.target.value.toUpperCase() })}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && mlState.newCustomValue.trim() !== '') {
+                                        updateMlState({ 
+                                          trainingLetter: mlState.newCustomValue.trim(), 
+                                          isDropdownOpen: false, 
+                                          isAddingCustom: false,
+                                          newCustomValue: ''
+                                        });
+                                      }
+                                    }}
+                                  />
+                                  <p className="text-[8px] text-slate-500 text-center">Tekan Enter untuk simpan</p>
+                                </div>
+                              ) : (
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); updateMlState({ isAddingCustom: true }); }}
+                                  className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-cyan-400 hover:text-cyan-300 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 rounded transition-colors"
+                                >
+                                  <Plus size={12} /> Label Kata Baru
+                                </button>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <button 
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition-all ${mlState.isRecording ? 'bg-red-500 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_10px_rgba(147,51,234,0.3)]'}`}
+                    onMouseDown={() => { updateMlState({ isStudioMode: true, isRecording: true }); }}
+                    onMouseUp={() => { updateMlState({ isRecording: false }); updateSampleCounts(); mlEngine.saveDatasetToStorage(mode); }}
+                    onMouseLeave={() => { updateMlState({ isRecording: false }); updateSampleCounts(); mlEngine.saveDatasetToStorage(mode); }}
+                  >
+                    {mlState.isRecording ? <StopCircle size={14} /> : <PlayCircle size={14} />}
+                    {mlState.isRecording ? 'MEREKAM DATA...' : 'TAHAN UNTUK REKAM (KLIK)'}
+                  </button>
+                </div>
+                <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-purple-500/20">
+                  <div className="flex justify-between items-center text-[10px] text-slate-400">
+                    <span className="bg-white/5 px-2 py-1 rounded">Total {mlState.trainingLetter}: <strong className="text-white text-xs">{mlState.sampleCounts[mlState.trainingLetter] || 0}</strong> baris</span>
+                    <span className="text-purple-300">Kelas Tersimpan: {Object.keys(mlState.sampleCounts).length}/26</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 w-full mt-2">
+                    <button onClick={() => mlEngine.downloadDatasetCSV(mode)} className="flex-1 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-[10px] font-bold transition-colors">📥 Export CSV Data</button>
+                    <button onClick={() => mlEngine.downloadDataset(mode)} className="flex-1 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-[10px] font-bold transition-colors">📥 Export Model (JSON)</button>
+                  </div>
+                  <div className="flex items-center gap-2 w-full">
+                    <button onClick={() => { mlEngine.clearAllData(mode); updateSampleCounts(); }} className={`${mode === 'letter' ? 'w-1/3' : 'w-1/3'} py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded text-[10px] font-bold transition-colors`}>Hapus Dataset</button>
+                    <label className={`${mode === 'letter' ? 'w-2/3' : 'w-2/3'} py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 rounded text-[10px] font-bold transition-colors text-center cursor-pointer`}>
+                      Pilih & Import Model
+                      <input type="file" accept=".json" className="hidden" onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            if (mlEngine.importDatasetFromJson(ev.target?.result as string, mode)) {
+                              updateSampleCounts();
+                              alert(`Model AI (${mode}) berhasil di-import!`);
+                            }
+                          };
+                          reader.readAsText(file);
+                        }
+                      }} />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-center font-bold text-purple-200 p-3 bg-purple-500/20 rounded-xl border border-purple-500/30 animate-pulse">
+                Uji Coba Model Aktif! 🚀 <br/><span className="text-[10px] font-normal">Sistem kini menebak berdasarkan data yang Anda rekam.</span>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Guide */}
+          <div className="p-5 rounded-2xl glass">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-3">Isyarat Aktif</p>
+            <div className="flex gap-2 flex-wrap">
+              {mode === 'letter' ? (
+                SIGN_DATA.map(s => (
+                  <div key={s.char} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${currentLetter === s.char ? 'bg-cyan-500/20 text-cyan-300 neon-border' : 'bg-white/5 text-slate-600'}`}>
+                    {s.char}
+                  </div>
+                ))
+              ) : (
+                Object.keys(mlState.sampleCounts).length > 0 ? (
+                  Object.keys(mlState.sampleCounts).map(label => (
+                    <div key={label} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${currentLetter === label ? 'bg-cyan-500/20 text-cyan-300 neon-border' : 'bg-white/5 text-slate-600'}`}>
+                      {label}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-xs text-slate-500 font-medium italic">Belum ada kata yang dilatih.</div>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ===================== MAIN LAYOUT =====================
+  return (
+    <div className="min-h-screen bg-[#050810] text-slate-100 selection:bg-cyan-500/30 relative overflow-hidden">
+      {/* Animated Background */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-grid opacity-50" />
+        <div className="absolute -top-[30%] -left-[15%] w-[60%] h-[60%] bg-cyan-500/[0.07] blur-[150px] rounded-full animate-float-slow" />
+        <div className="absolute -bottom-[30%] -right-[15%] w-[60%] h-[60%] bg-purple-500/[0.07] blur-[150px] rounded-full animate-float-slow" style={{ animationDelay: '4s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] bg-emerald-500/[0.03] blur-[120px] rounded-full" />
+      </div>
+
+      {/* Navbar */}
+      <nav className="relative z-50 px-6 md:px-10 py-5 flex justify-between items-center glass-strong border-b border-white/[0.03]">
+        <button onClick={() => navigateTo('home')} className="flex items-center gap-3 group">
+          <div className="relative w-12 h-12 rounded-2xl glass border border-white/10 flex items-center justify-center shadow-lg shadow-cyan-500/10 group-hover:shadow-cyan-500/30 transition-all overflow-hidden bg-white/5">
+            <img src="/logo.png" alt="AlphaBrain Logo" className="w-full h-full object-cover scale-110" />
+          </div>
+          <div>
+            <span className="font-black text-xl tracking-tight text-white">Alpha<span className="text-gradient-cyan">Brain</span></span>
+            <span className="ml-2 text-[9px] font-bold text-cyan-400 uppercase tracking-widest px-2 py-0.5 rounded-full border border-cyan-400/30">Training</span>
+          </div>
+        </button>
+        
+        <div className="flex items-center gap-2">
+          <button onClick={() => navigateTo('home')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${currentPage === 'home' ? 'text-white bg-white/5' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
+            Beranda
+          </button>
+          <button onClick={() => navigateTo('guide')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${currentPage === 'guide' ? 'text-white bg-white/5' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
+            Dataset Library
+          </button>
+          <div className="flex gap-1 ml-2 bg-slate-800/50 p-1 rounded-2xl border border-slate-700/50 shadow-inner">
+            <button 
+              onClick={() => { navigateTo('detector-letter'); updateMlState({ activeMode: 'letter', trainingLetter: 'A' }); updateSampleCounts('letter'); }} 
+              className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${currentPage === 'detector-letter' ? 'bg-gradient-to-r from-purple-500 to-cyan-600 text-white shadow-lg shadow-purple-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+            >
+              Studio Huruf
+            </button>
+            <button 
+              onClick={() => { navigateTo('detector-word'); updateMlState({ activeMode: 'word', trainingLetter: 'KATA_1' }); updateSampleCounts('word'); }} 
+              className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${currentPage === 'detector-word' ? 'bg-gradient-to-r from-cyan-500 to-emerald-600 text-white shadow-lg shadow-cyan-500/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+            >
+              Studio Kata
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Content */}
+      <main className="relative z-10 max-w-7xl mx-auto py-10 px-6">
+        {currentPage === 'home' && LandingPage()}
+        {currentPage === 'guide' && GuidePage()}
+        {currentPage === 'detector-letter' && DetectorPage('letter')}
+        {currentPage === 'detector-word' && DetectorPage('word')}
+      </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 py-10 border-t border-white/[0.03]">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg glass border border-white/5 flex items-center justify-center overflow-hidden">
+               <img src="/logo.png" alt="AlphaBrain" className="w-full h-full object-cover" />
+            </div>
+            <span className="text-sm text-slate-600 font-semibold">AlphaBrain &copy; 2026</span>
+          </div>
+          <p className="text-xs text-slate-700">Inovasi Tanpa Batas &mdash; Komunikasi untuk Semua</p>
+   
