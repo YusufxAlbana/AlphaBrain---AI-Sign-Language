@@ -271,10 +271,10 @@ function App() {
       } else if (mlParams.useMLMode && mlEngine.classifiers[mlParams.activeMode].getNumClasses() > 0) {
         // Mode AI Prediksi
         const features = mlEngine.processLandmarksToFeatures(landmarks);
-        mlEngine.classifiers[mlParams.activeMode].predictClass(features).then(res => {
+        mlEngine.classifiers[mlParams.activeMode].predictClass(features).then((res: { label: string; confidences: { [key: string]: number } }) => {
           handleGesture(res.label);
           features.dispose();
-        }).catch(err => console.error(err));
+        }).catch((err: any) => console.error(err));
       } else {
         // Mode Heuristik
         const letter = detectHandSign(landmarks, handedness);
