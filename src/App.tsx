@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import Webcam from 'react-webcam';
-import { Hands, Results } from '@mediapipe/hands';
+import * as HandsNS from '@mediapipe/hands';
 import * as drawingUtils from '@mediapipe/drawing_utils';
+
+// Fix for Mediapipe constructor in Vite production builds
+const Hands = (HandsNS as any).Hands || (HandsNS as any).default?.Hands || HandsNS;
+type Results = HandsNS.Results;
 import { 
   Camera, 
   MessageSquare, 
@@ -175,20 +179,11 @@ function App() {
     // Load dataset from local storage on first mount
     const loadInitialData = async () => {
       try {
-        // Try to load from localStorage first
-        const hasLetterData = mlEngine.loadDatasetFromStorage('letter');
-        const hasWordData = mlEngine.loadDatasetFromStorage('word');
-
-        // If no data in localStorage, try to fetch the default asl_dataset.json
-        if (!hasLetterData) {
-          const response = await fetch('/asl_dataset.json');
-          if (response.ok) {
-            const defaultDataset = await response.json();
-            mlEngine.importDataset('letter', defaultDataset);
-          }
-        }
+        // Only load from localStorage. No more auto-fetching broken datasets.
+        mlEngine.loadDatasetFromStorage('letter');
+        mlEngine.loadDatasetFromStorage('word');
       } catch (error) {
-        console.error("Failed to load initial dataset:", error);
+        console.error("Failed to load local dataset:", error);
       } finally {
         updateSampleCounts();
         setIsModelLoading(false);
@@ -205,7 +200,7 @@ function App() {
     let animationFrameId: number;
 
     const hands = new Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+      locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424515/${file}`,
     });
 
     hands.setOptions({
