@@ -125,9 +125,7 @@ function App() {
     isDropdownOpen: false,
     customLabels: [] as string[],
     isAddingCustom: false,
-    newCustomValue: "",
-    isAutoTraining: false,
-    autoTrainProgress: 0
+    newCustomValue: ""
   });
 
   const updateMlState = (updates: Partial<typeof mlState>) => {
@@ -140,57 +138,61 @@ function App() {
     setMlState(prev => ({ ...prev, sampleCounts: counts }));
   };
   
-  const handleAutoTrain = async () => {
-    if (mlState.isAutoTraining) return;
-    updateMlState({ isAutoTraining: true, autoTrainProgress: 0 });
+  const handleExportDataset = () => {
+    mlEngine.downloadDataset(mlState.activeMode);
+  };
 
-    try {
-      // Load compact base poses (14KB) — augmentation happens here in the browser
-      updateMlState({ autoTrainProgress: 5 });
-      const res = await fetch('/asl_base_poses.json');
-      if (!res.ok) throw new Error(`HTTP ${res.status}: asl_base_poses.json not found`);
-      const basePoses: Record<string, number[]> = await res.json();
+  const handleImportDataset = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      const letters = Object.keys(basePoses);
-      let loaded = 0;
-
-      for (const letter of letters) {
-        const flat = basePoses[letter]; // [x0,y0,x1,y1,...,x20,y20]
-        // Convert flat array back to MediaPipe-compatible landmark objects
-        const landmarks: { x: number; y: number; z: number }[] = [];
-        for (let i = 0; i < flat.length; i += 2) {
-          landmarks.push({ x: flat[i], y: flat[i + 1], z: 0 });
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        const success = mlEngine.importDataset(mlState.activeMode, json);
+        if (success) {
+          updateSampleCounts();
+          alert("Dataset berhasil di-import!");
+        } else {
+          alert("Format dataset tidak valid!");
         }
-        // Generate 60 augmented samples from this base pose
-        mlEngine.addAugmentedStaticExamples(landmarks, letter, 'letter', 60);
-        loaded++;
-        updateMlState({ autoTrainProgress: 5 + Math.round((loaded / letters.length) * 90) });
-        // Yield to browser per letter to keep UI responsive
-        await new Promise(r => setTimeout(r, 0));
+      } catch (err) {
+        alert("Gagal membaca file JSON!");
       }
-
-      // NOTE: We do NOT save auto-train to localStorage (too large).
-      // Base poses are re-generated from JSON every startup (fast, pure math).
-      // Then reload any user-recorded samples on top.
-      mlEngine.loadDatasetFromStorage('letter');
-      updateSampleCounts('letter');
-      updateMlState({ isAutoTraining: false, autoTrainProgress: 100 });
-    } catch (err) {
-      console.error('AutoTrain failed:', err);
-      updateMlState({ isAutoTraining: false, autoTrainProgress: 0 });
-      alert(`Auto-Training gagal: ${err}`);
-    }
+    };
+    reader.readAsText(file);
+    e.target.value = ""; // Reset input
   };
 
   const FRAME_THRESHOLD = 15;
 
   useEffect(() => {
-    // Always run auto-train on startup (re-generates A-Z base poses from JSON, fast).
-    // User-recorded samples are merged back on top after auto-train completes.
-    mlEngine.loadDatasetFromStorage('word');
-    updateSampleCounts();
-    setIsModelLoading(false);
-    handleAutoTrain();
+    setIsModelLoading(true);
+    // Load dataset from local storage on first mount
+    const loadInitialData = async () => {
+      try {
+        // Try to load from localStorage first
+        const hasLetterData = mlEngine.loadDatasetFromStorage('letter');
+        const hasWordData = mlEngine.loadDatasetFromStorage('word');
+
+        // If no data in localStorage, try to fetch the default asl_dataset.json
+        if (!hasLetterData) {
+          const response = await fetch('/asl_dataset.json');
+          if (response.ok) {
+            const defaultDataset = await response.json();
+            mlEngine.importDataset('letter', defaultDataset);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load initial dataset:", error);
+      } finally {
+        updateSampleCounts();
+        setIsModelLoading(false);
+      }
+    };
+
+    loadInitialData();
   }, []);
 
   useEffect(() => {
@@ -385,7 +387,7 @@ function App() {
               className="group w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-2xl glass hover:bg-white/5 border border-white/10 hover:border-white/20 text-white font-bold text-lg transition-all hover:-translate-y-1"
             >
               <BookOpen size={22} className="text-slate-400 group-hover:text-purple-400 transition-colors" />
-              Lihat Dataset
+              Lihat Panduan
             </button>
           </div>
           
@@ -506,7 +508,7 @@ function App() {
               <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Database</span>
             </div>
             <h2 className="text-4xl md:text-6xl font-black text-white mb-4 leading-tight">
-              Dataset <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">Library</span>
+              Panduan <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400">Library</span>
             </h2>
             <p className="text-lg text-slate-300 leading-relaxed font-light">
               Referensi bentuk standar yang digunakan untuk mengumpulkan data. Tiru pose ini di dalam AI Studio untuk merekam Dataset berkualitas tinggi.
@@ -637,57 +639,31 @@ function App() {
         {/* Camera - 3 cols */}
         <div className="lg:col-span-3 space-y-4">
           <div className="relative rounded-[2rem] overflow-hidden bg-[#050810] aspect-video border border-white/5 shadow-2xl animate-glow-breathe">
-            {/* Loading / Auto-Training Overlay */}
-            {(isModelLoading || mlState.isAutoTraining) && (
+            {/* Loading Overlay */}
+            {isModelLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-[#050810]/95 backdrop-blur-md z-50">
                 <div className="flex flex-col items-center max-w-xs text-center px-6">
                   <div className="relative w-20 h-20 mb-8">
                     <div className="absolute inset-0 border-4 border-cyan-500/10 rounded-full" />
                     <div className="absolute inset-0 border-4 border-transparent border-t-cyan-500 rounded-full animate-spin" />
-                    <div className="absolute inset-3 border-4 border-transparent border-b-purple-500 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1s' }} />
                     <div className="absolute inset-0 flex items-center justify-center">
                        <Sparkles size={24} className="text-cyan-400 animate-pulse" />
                     </div>
                   </div>
-                  
-                  <h3 className="text-xl font-black text-white mb-2 tracking-tight">
-                    {mlState.isAutoTraining ? 'Mensinkronkan Otak AI' : 'Memuat Engine'}
-                  </h3>
-                  
-                  <p className="text-sm font-bold text-cyan-400/80 tracking-widest uppercase mb-4">
-                    {mlState.isAutoTraining ? `Proses: ${mlState.autoTrainProgress}%` : 'Sistem Siap...'}
-                  </p>
-                  
-                  {mlState.isAutoTraining && (
-                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                      <div 
-                        className="h-full bg-gradient-to-r from-cyan-500 to-purple-600 transition-all duration-300 shadow-[0_0_10px_rgba(6,182,212,0.5)]"
-                        style={{ width: `${mlState.autoTrainProgress}%` }}
-                      />
-                    </div>
-                  )}
-                  
-                  <p className="text-[10px] text-slate-500 mt-6 leading-relaxed">
-                    {mlState.isAutoTraining 
-                      ? 'AlphaBrain sedang mempelajari koordinat titik tangan dari panduan visual secara otomatis...' 
-                      : 'Mengunduh model deteksi tangan MediaPipe...'}
-                  </p>
+                  <h3 className="text-xl font-black text-white mb-2 tracking-tight">Memuat Engine</h3>
+                  <p className="text-sm font-bold text-cyan-400/80 tracking-widest uppercase">Sistem Siap...</p>
                 </div>
               </div>
             )}
 
-            {/* Webcam & Canvas (Only render if NOT auto-training) */}
-            {!mlState.isAutoTraining && (
-              <>
-                <Webcam 
-                  ref={webcamRef} 
-                  className="absolute inset-0 w-full h-full object-cover" 
-                  mirrored 
-                  videoConstraints={{ width: 1280, height: 720, facingMode: "user" }}
-                />
-                <canvas ref={canvasRef} width={1280} height={720} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
-              </>
-            )}
+            {/* Webcam & Canvas */}
+            <Webcam 
+              ref={webcamRef} 
+              className="absolute inset-0 w-full h-full object-cover" 
+              mirrored 
+              videoConstraints={{ width: 1280, height: 720, facingMode: "user" }}
+            />
+            <canvas ref={canvasRef} width={1280} height={720} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
             
             {/* Corner decorations */}
             <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-cyan-500/40 rounded-tl-lg" />
@@ -696,19 +672,17 @@ function App() {
             <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-cyan-500/40 rounded-br-lg" />
 
             {/* Status Badge */}
-            {!mlState.isAutoTraining && (
-              <div className="absolute top-6 left-6">
-                <div className="px-5 py-2.5 rounded-2xl glass text-xs font-bold flex items-center gap-3">
-                  <div className={`w-2.5 h-2.5 rounded-full ${currentLetter ? 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]' : 'bg-slate-600'}`} />
-                  <span className={currentLetter ? 'text-cyan-300' : 'text-slate-500'}>
-                    {currentLetter ? `TERDETEKSI: ${currentLetter}` : 'MENCARI TANGAN...'}
-                  </span>
-                </div>
+            <div className="absolute top-6 left-6">
+              <div className="px-5 py-2.5 rounded-2xl glass text-xs font-bold flex items-center gap-3">
+                <div className={`w-2.5 h-2.5 rounded-full ${currentLetter ? 'bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.8)]' : 'bg-slate-600'}`} />
+                <span className={currentLetter ? 'text-cyan-300' : 'text-slate-500'}>
+                  {currentLetter ? `TERDETEKSI: ${currentLetter}` : 'MENCARI TANGAN...'}
+                </span>
               </div>
-            )}
+            </div>
 
             {/* Current Letter Badge */}
-            {!mlState.isAutoTraining && currentLetter && (
+            {currentLetter && (
               <div className="absolute bottom-6 right-6">
                 <div className="w-auto min-w-[5rem] h-20 px-6 rounded-2xl glass neon-border flex items-center justify-center animate-letter-pop">
                   <span className="text-4xl font-black text-cyan-400">{currentLetter}</span>
@@ -783,7 +757,7 @@ function App() {
           </div>
 
           {/* ML Studio / AI Training Card - Moved to TOP priority */}
-          <div className="p-5 rounded-2xl glass border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.1)] order-first">
+          <div className="p-5 rounded-2xl glass border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.1)] order-first relative z-40">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-purple-500/20">
@@ -814,8 +788,8 @@ function App() {
                     
                     {mlState.isDropdownOpen && (
                       <>
-                        <div className="fixed inset-0" onClick={() => updateMlState({ isDropdownOpen: false, isAddingCustom: false })} />
-                        <div className="absolute top-full mt-2 left-0 w-48 bg-[#0f172a]/95 backdrop-blur-xl border border-purple-500/30 rounded-xl shadow-2xl shadow-purple-500/20 max-h-60 overflow-y-auto z-50 py-2">
+                        <div className="fixed inset-0 z-[90]" onClick={() => updateMlState({ isDropdownOpen: false, isAddingCustom: false })} />
+                        <div className="absolute top-full mt-2 left-0 w-48 bg-[#0f172a]/95 backdrop-blur-xl border border-purple-500/30 rounded-xl shadow-2xl shadow-purple-500/20 max-h-60 overflow-y-auto z-[100] py-2">
                           {mode === 'letter' && SIGN_DATA.map(s => (
                             <button
                               key={s.char}
@@ -895,61 +869,45 @@ function App() {
                 <div className="flex flex-col gap-3 mt-4 pt-4 border-t border-purple-500/20">
                   <div className="flex justify-between items-center text-[10px] text-slate-400">
                     <span className="bg-white/5 px-2 py-1 rounded">Total {mlState.trainingLetter}: <strong className="text-white text-xs">{mlState.sampleCounts[mlState.trainingLetter] || 0}</strong> baris</span>
-                    <span className="text-purple-300">Kelas Tersimpan: {Object.keys(mlState.sampleCounts).length}/26</span>
+                    <span className="text-purple-300">Kelas Tersimpan: {Object.keys(mlState.sampleCounts).length}</span>
                   </div>
-                  
                   <div className="flex items-center gap-2 w-full mt-2">
-                    <button onClick={() => mlEngine.downloadDatasetCSV(mode)} className="flex-1 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-[10px] font-bold transition-colors">📥 Export CSV Data</button>
-                    <button onClick={() => mlEngine.downloadDataset(mode)} className="flex-1 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-[10px] font-bold transition-colors">📥 Export Model (JSON)</button>
+                    <button onClick={() => mlEngine.downloadDatasetCSV(mode)} className="flex-1 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-[10px] font-bold transition-colors">📥 Export CSV</button>
+                    <button onClick={handleExportDataset} className="flex-1 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-[10px] font-bold transition-colors">📥 Download Model (JSON)</button>
                   </div>
                   <div className="flex items-center gap-2 w-full">
-                    <button onClick={() => { mlEngine.clearAllData(mode); updateSampleCounts(); }} className={`${mode === 'letter' ? 'w-1/3' : 'w-1/3'} py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded text-[10px] font-bold transition-colors`}>Hapus Dataset</button>
-                    <label className={`${mode === 'letter' ? 'w-2/3' : 'w-2/3'} py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 rounded text-[10px] font-bold transition-colors text-center cursor-pointer`}>
-                      Pilih & Import Model
-                      <input type="file" accept=".json" className="hidden" onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (ev) => {
-                            if (mlEngine.importDatasetFromJson(ev.target?.result as string, mode)) {
-                              updateSampleCounts();
-                              alert(`Model AI (${mode}) berhasil di-import!`);
-                            }
-                          };
-                          reader.readAsText(file);
-                        }
-                      }} />
+                    <button onClick={() => { if(confirm("Hapus semua data yang dilatih?")) { mlEngine.clearAllData(mode); updateSampleCounts(); } }} className="w-1/3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded text-[10px] font-bold transition-colors">Hapus Semua</button>
+                    <label className="w-2/3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 rounded text-[10px] font-bold transition-colors text-center cursor-pointer flex items-center justify-center gap-2">
+                      <Plus size={10} /> Import Model (.json)
+                      <input type="file" accept=".json" className="hidden" onChange={handleImportDataset} />
                     </label>
                   </div>
+                  <p className="text-[9px] text-slate-500 italic mt-1">*LocalStorage terbatas 5MB. Gunakan 'Download Model' untuk menyimpan permanen.</p>
                 </div>
               </div>
             ) : (
               <div className="text-xs text-center font-bold text-purple-200 p-3 bg-purple-500/20 rounded-xl border border-purple-500/30 animate-pulse">
-                Uji Coba Model Aktif! 🚀 <br/><span className="text-[10px] font-normal">Sistem kini menebak berdasarkan data yang Anda rekam.</span>
+                Uji Coba Model Aktif! 🚀 <br/><span className="text-[10px] font-normal">Sistem menebak berdasarkan data manual Anda.</span>
               </div>
             )}
           </div>
 
           {/* Quick Guide */}
           <div className="p-5 rounded-2xl glass">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-3">Isyarat Aktif</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-3">Model Tersimpan</p>
             <div className="flex gap-2 flex-wrap">
-              {mode === 'letter' ? (
-                SIGN_DATA.map(s => (
-                  <div key={s.char} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${currentLetter === s.char ? 'bg-cyan-500/20 text-cyan-300 neon-border' : 'bg-white/5 text-slate-600'}`}>
-                    {s.char}
+              {Object.keys(mlState.sampleCounts).length > 0 ? (
+                Object.keys(mlState.sampleCounts).map(label => (
+                  <div 
+                    key={label} 
+                    onClick={() => updateMlState({ trainingLetter: label })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${currentLetter === label ? 'bg-cyan-500/20 text-cyan-300 neon-border' : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'}`}
+                  >
+                    {label} <span className="ml-1 text-[8px] opacity-50">({mlState.sampleCounts[label]})</span>
                   </div>
                 ))
               ) : (
-                Object.keys(mlState.sampleCounts).length > 0 ? (
-                  Object.keys(mlState.sampleCounts).map(label => (
-                    <div key={label} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${currentLetter === label ? 'bg-cyan-500/20 text-cyan-300 neon-border' : 'bg-white/5 text-slate-600'}`}>
-                      {label}
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-xs text-slate-500 font-medium italic">Belum ada kata yang dilatih.</div>
-                )
+                <div className="text-xs text-slate-500 font-medium italic">Belum ada data yang dilatih. Mulai rekam untuk menambahkan.</div>
               )}
             </div>
           </div>
@@ -986,7 +944,7 @@ function App() {
             Beranda
           </button>
           <button onClick={() => navigateTo('guide')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${currentPage === 'guide' ? 'text-white bg-white/5' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
-            Dataset Library
+            Panduan Library
           </button>
           <div className="flex gap-1 ml-2 bg-slate-800/50 p-1 rounded-2xl border border-slate-700/50 shadow-inner">
             <button 
@@ -1023,4 +981,10 @@ function App() {
             <span className="text-sm text-slate-600 font-semibold">AlphaBrain &copy; 2026</span>
           </div>
           <p className="text-xs text-slate-700">Inovasi Tanpa Batas &mdash; Komunikasi untuk Semua</p>
-   
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+export default App;

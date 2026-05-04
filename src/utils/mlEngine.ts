@@ -195,18 +195,48 @@ export const clearAllData = (mode: MLMode) => {
   localStorage.removeItem(getStorageKey(mode));
 };
 
-// Export dataset to JSON file
+// Import dataset from a JSON object (from file upload)
+export const importDataset = (mode: MLMode, datasetObj: any) => {
+  try {
+    const dataset: any = {};
+    Object.keys(datasetObj).forEach((key) => {
+      const arr = datasetObj[key];
+      if (arr.length % NUM_FEATURES !== 0) {
+        throw new Error(`Data untuk "${key}" tidak valid.`);
+      }
+      dataset[key] = tf.tensor2d(arr, [arr.length / NUM_FEATURES, NUM_FEATURES]);
+    });
+
+    classifiers[mode].setClassifierDataset(dataset);
+    saveDatasetToStorage(mode);
+    return true;
+  } catch (e) {
+    console.error("Gagal import dataset:", e);
+    return false;
+  }
+};
+
+
+
+// Export dataset to JSON file (Download)
 export const downloadDataset = (mode: MLMode) => {
-  const jsonStr = localStorage.getItem(getStorageKey(mode));
-  if (!jsonStr) {
-    alert("Belum ada data AI yang dilatih!");
+  const dataset = classifiers[mode].getClassifierDataset();
+  if (Object.keys(dataset).length === 0) {
+    alert("Belum ada data untuk di-download!");
     return;
   }
-  const blob = new Blob([jsonStr], { type: "application/json" });
+  
+  const datasetObj: any = {};
+  Object.keys(dataset).forEach((key) => {
+    const data = dataset[key].dataSync();
+    datasetObj[key] = Array.from(data);
+  });
+  
+  const blob = new Blob([JSON.stringify(datasetObj)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+  const a = document.createElement('a');
   a.href = url;
-  a.download = `alphabrain_ai_${mode}_model.json`;
+  a.download = `alphabrain_${mode}_model.json`;
   a.click();
 };
 
