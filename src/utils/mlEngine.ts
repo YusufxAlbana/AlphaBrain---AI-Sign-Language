@@ -1,10 +1,24 @@
 import * as tf from '@tensorflow/tfjs';
 import * as knnClassifier from '@tensorflow-models/knn-classifier';
 
-// Global classifier instances
-export const classifiers = {
-  letter: knnClassifier.create(),
-  word: knnClassifier.create()
+// Global classifier instances with lazy initialization
+let letterClassifier: any = null;
+let wordClassifier: any = null;
+
+export const classifiers: any = {
+  get letter() {
+    if (!letterClassifier) letterClassifier = knnClassifier.create();
+    return letterClassifier;
+  },
+  get word() {
+    if (!wordClassifier) wordClassifier = knnClassifier.create();
+    return wordClassifier;
+  },
+  // Compatibility with existing code that might check keys
+  clearAllClasses() {
+    if (letterClassifier) letterClassifier.clearAllClasses();
+    if (wordClassifier) wordClassifier.clearAllClasses();
+  }
 };
 
 export type MLMode = 'letter' | 'word';

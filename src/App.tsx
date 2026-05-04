@@ -4,7 +4,8 @@ import * as HandsNS from '@mediapipe/hands';
 import * as drawingUtils from '@mediapipe/drawing_utils';
 
 // Fix for Mediapipe constructor in Vite production builds
-const Hands = (HandsNS as any).Hands || (HandsNS as any).default?.Hands || HandsNS;
+// Fix for Mediapipe constructor in Vite production builds
+const Hands = (HandsNS as any).Hands || (HandsNS as any).default?.Hands || (HandsNS as any).default || HandsNS;
 type Results = HandsNS.Results;
 import { 
   Camera, 
