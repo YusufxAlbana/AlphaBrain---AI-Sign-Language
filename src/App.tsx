@@ -27,7 +27,7 @@ import {
 import { detectHandSign } from './utils/signLogic';
 import * as mlEngine from './utils/mlEngine';
 
-type Page = 'home' | 'guide' | 'detector-letter' | 'detector-word';
+type Page = 'home' | 'guide' | 'detector-letter' | 'detector-word' | 'example';
 
 const HAND_CONNECTIONS: [number, number][] = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
 
@@ -76,6 +76,7 @@ function App() {
     if (page === 'guide') path = '/dataset-library';
     if (page === 'detector-letter') path = '/studio-huruf';
     if (page === 'detector-word') path = '/studio-kata';
+    if (page === 'example') path = '/contoh-penggunaan';
     
     if (window.location.pathname !== path) {
       window.history.pushState({ page }, '', path);
@@ -91,6 +92,7 @@ function App() {
         if (path === '/dataset-library') navigateTo('guide');
         else if (path === '/studio-huruf') navigateTo('detector-letter');
         else if (path === '/studio-kata') navigateTo('detector-word');
+        else if (path === '/contoh-penggunaan') navigateTo('example');
         else navigateTo('home');
       }
     };
@@ -100,6 +102,7 @@ function App() {
     if (path === '/dataset-library') navigateTo('guide');
     else if (path === '/studio-huruf') navigateTo('detector-letter');
     else if (path === '/studio-kata') navigateTo('detector-word');
+    else if (path === '/contoh-penggunaan') navigateTo('example');
     else navigateTo('home');
 
     window.addEventListener('popstate', handlePopState);
@@ -354,8 +357,20 @@ function App() {
           <p className="animate-fade-up stagger-2 text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed font-light">
             Buat Dataset Bahasa Isyarat Anda sendiri langsung di dalam browser. Rekam 21 titik rangka tangan, latih model AI secara real-time, lalu Export hasilnya (JSON/CSV) untuk project Anda!
           </p>
-
           <div className="animate-fade-up stagger-3 flex flex-col sm:flex-row items-center lg:justify-start justify-center gap-5">
+            <button 
+              onClick={() => navigateTo('example')}
+              className="group relative w-full sm:w-auto overflow-hidden flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-bold text-lg transition-all transform hover:-translate-y-1 hover:shadow-[0_20px_40px_-10px_rgba(34,197,94,0.4)]"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 transition-all group-hover:scale-110 duration-500" />
+              <div className="absolute top-0 left-[-100%] w-[50%] h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[-20deg] group-hover:animate-shimmer" />
+              <span className="relative flex items-center gap-3 text-white">
+                <Info size={22} />
+                Apa ini?
+                <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              </span>
+            </button>
+
             <button 
               onClick={() => { navigateTo('detector-letter'); updateMlState({ activeMode: 'letter', trainingLetter: 'A' }); updateSampleCounts('letter'); }}
               className="group relative w-full sm:w-auto overflow-hidden flex items-center justify-center gap-3 px-8 py-4 rounded-2xl font-bold text-lg transition-all transform hover:-translate-y-1 hover:shadow-[0_20px_40px_-10px_rgba(6,182,212,0.4)]"
@@ -416,51 +431,87 @@ function App() {
             {/* Holographic glowing orb */}
             <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-cyan-500/20 to-purple-600/20 blur-3xl animate-pulse-neon" />
             
-            {/* Floating UI Elements representing the product */}
+            {/* AI-Generated Hero Visual */}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative w-full h-full">
-                {/* Main Glass Card */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-96 glass-strong rounded-3xl border border-white/10 shadow-2xl overflow-hidden backdrop-blur-xl">
+                {/* Main Glass Card with AI Background */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[420px] glass-strong rounded-[2rem] border border-white/10 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden backdrop-blur-xl">
                   <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-cyan-400 to-purple-500" />
-                  <div className="p-6 h-full flex flex-col">
-                    <div className="flex justify-between items-center mb-8">
+                  <img 
+                    src="https://image.pollinations.ai/prompt/futuristic%20holographic%20hand%20tracking%20interface%20dark%20background%20cyan%20purple%20neon%20lights%20realistic%204k%20detailed?width=400&height=500&nologo=true&seed=101" 
+                    alt="AI Hand Tracking Interface" 
+                    className="absolute inset-0 w-full h-full object-cover opacity-60"
+                    loading="lazy"
+                  />
+                  <div className="relative z-10 p-6 h-full flex flex-col bg-gradient-to-b from-transparent via-[#050810]/50 to-[#050810]">
+                    <div className="flex justify-between items-center mb-4">
                       <div className="flex gap-2">
                         <div className="w-3 h-3 rounded-full bg-red-500/80" />
                         <div className="w-3 h-3 rounded-full bg-amber-500/80" />
                         <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
                       </div>
-                      <Hand className="text-cyan-400" size={24} />
+                      <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-500/30">
+                        <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                        <span className="text-[10px] font-bold text-cyan-300 tracking-wider uppercase">Live</span>
+                      </div>
                     </div>
-                    {/* Simulated hand skeleton */}
-                    <div className="flex-1 relative flex items-center justify-center">
-                      <div className="absolute w-32 h-32 border border-cyan-500/30 rounded-full animate-ping" style={{ animationDuration: '3s' }} />
-                      <div className="w-full h-full bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjIiIGZpbGw9IiMwNmI2ZDQiLz48Y2lyY2xlIGN4PSI4MCIgY3k9IjgwIiByPSIyIiBmaWxsPSIjMDZiNmQ0Ii8+PGNpcmNsZSBjeD0iMTIwIiBjeT0iODAiIHI9IjIiIGZpbGw9IiMwNmI2ZDQiLz48cGF0aCBkPSJNMTAwIDEwMCBMIDgwIDgwIE0xMDAgMTAwIEwgMTIwIDgwIiBzdHJva2U9IiMwNmI2ZDQiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC41Ii8+PC9zdmc+')] bg-center bg-no-repeat opacity-50" />
-                      <div className="absolute text-5xl font-black text-white shadow-[0_0_30px_rgba(255,255,255,0.5)]">✌️</div>
-                    </div>
-                    <div className="mt-auto pt-4 border-t border-white/5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-xl">V</div>
-                        <div>
-                          <p className="text-xs text-slate-400">Terdeteksi</p>
-                          <p className="text-sm font-bold text-white">Confidence: 98%</p>
+                    
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="relative inline-block mb-4">
+                          <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full" />
+                          <span className="relative text-7xl filter drop-shadow-[0_0_15px_rgba(6,182,212,0.6)]">✌️</span>
                         </div>
+                        <div className="glass px-4 py-2 rounded-xl border border-cyan-500/30 inline-block">
+                          <p className="text-xs font-bold text-cyan-300 tracking-widest uppercase">Huruf V Terdeteksi</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-auto pt-4 border-t border-white/10 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-400">Confidence</span>
+                        <span className="text-sm font-bold text-emerald-400">98.4%</span>
+                      </div>
+                      <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full w-[98%] bg-gradient-to-r from-cyan-500 to-emerald-500 rounded-full" />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-500">
+                        <span>21 Titik Sendi Aktif</span>
+                        <span>60 FPS</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Floating smaller cards */}
-                <div className="absolute -right-12 top-20 w-48 p-4 glass rounded-2xl border border-white/10 shadow-xl animate-float" style={{ animationDelay: '-2s' }}>
-                  <div className="flex items-center gap-3">
+                {/* Floating Stats Cards */}
+                <div className="absolute -right-8 top-16 w-56 p-4 glass rounded-2xl border border-white/10 shadow-xl animate-float backdrop-blur-md" style={{ animationDelay: '-2s' }}>
+                  <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 bg-emerald-500/20 rounded-lg"><Zap size={16} className="text-emerald-400" /></div>
-                    <p className="text-sm font-bold text-white">60 FPS Processing</p>
+                    <p className="text-sm font-bold text-white">Processing</p>
                   </div>
+                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden mb-1">
+                    <div className="h-full w-[85%] bg-emerald-500 rounded-full animate-pulse" />
+                  </div>
+                  <p className="text-[10px] text-emerald-400 font-mono">60 FPS • 0.2ms Latency</p>
                 </div>
                 
-                <div className="absolute -left-8 bottom-32 w-52 p-4 glass rounded-2xl border border-white/10 shadow-xl animate-float" style={{ animationDelay: '-1s' }}>
-                  <div className="flex items-center gap-3">
+                <div className="absolute -left-6 bottom-28 w-60 p-4 glass rounded-2xl border border-white/10 shadow-xl animate-float backdrop-blur-md" style={{ animationDelay: '-1s' }}>
+                  <div className="flex items-center gap-3 mb-3">
                     <div className="p-2 bg-purple-500/20 rounded-lg"><Shield size={16} className="text-purple-400" /></div>
-                    <p className="text-sm font-bold text-white">100% Private</p>
+                    <p className="text-sm font-bold text-white">Privacy Shield</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <p className="text-[10px] text-slate-300">100% Local Processing</p>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">Data tidak pernah meninggalkan perangkat</p>
+                </div>
+
+                <div className="absolute right-4 bottom-10 w-48 p-3 glass rounded-xl border border-cyan-500/20 shadow-lg animate-float backdrop-blur-md" style={{ animationDelay: '-3s' }}>
+                  <div className="flex items-center gap-2">
+                    <Brain size={14} className="text-cyan-400" />
+                    <p className="text-xs font-bold text-cyan-300">KNN Model Ready</p>
                   </div>
                 </div>
               </div>
@@ -494,13 +545,213 @@ function App() {
     </div>
   );
 
+  // ===================== EXAMPLE PAGE =====================
+  const ExamplePage = () => {
+    return (
+      <div className="animate-fade-up w-full max-w-7xl mx-auto px-4 pb-20">
+        <div className="text-center mt-12 mb-16">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass border border-emerald-500/30 mb-6">
+            <Info size={16} className="text-emerald-400" />
+            <span className="text-xs font-bold text-emerald-300 uppercase tracking-widest">Tentang AlphaBrain</span>
+          </div>
+          <h2 className="text-4xl md:text-6xl font-black text-white mb-6">
+            Bagaimana <span className="text-gradient-cyan">Cara Kerjanya?</span>
+          </h2>
+          <p className="text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed">
+            AlphaBrain adalah studio AI tanpa coding yang memungkinkan Anda melatih komputer untuk mengenali gerakan tangan Anda sendiri.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center mb-24">
+          <div className="space-y-8">
+            <div className="holo-card p-8 rounded-3xl border border-white/5">
+              <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-3">
+                <div className="p-2 bg-cyan-500/20 rounded-lg text-cyan-400"><Zap size={24} /></div>
+                1. Deteksi Titik Sendi
+              </h3>
+              <p className="text-slate-400 leading-relaxed">
+                Kamera akan melacak 21 titik koordinat pada tangan Anda secara real-time. Kami menggunakan teknologi MediaPipe untuk memastikan deteksi tetap akurat meski tangan bergerak cepat.
+              </p>
+            </div>
+            <div className="holo-card p-8 rounded-3xl border border-white/5">
+              <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-3">
+                <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400"><Brain size={24} /></div>
+                2. Latih Otak AI Anda
+              </h3>
+              <p className="text-slate-400 leading-relaxed">
+                Dalam <b>Studio AI</b>, Anda bisa merekam contoh gerakan (misalnya huruf A atau kata 'Halo'). Komputer akan mempelajari pola koordinat tersebut menggunakan algoritma KNN (K-Nearest Neighbors).
+              </p>
+            </div>
+            <div className="holo-card p-8 rounded-3xl border border-white/5">
+              <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400"><MessageSquare size={24} /></div>
+                3. Prediksi Real-time
+              </h3>
+              <p className="text-slate-400 leading-relaxed">
+                Setelah dilatih, AI akan mencoba menebak gerakan tangan Anda. Hasilnya bisa langsung muncul sebagai teks di layar, membantu komunikasi tanpa suara.
+              </p>
+            </div>
+          </div>
+          
+          <div className="relative group">
+            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-purple-600/20 blur-3xl rounded-full" />
+            <div className="relative glass-strong p-4 rounded-[2.5rem] border border-white/10 shadow-2xl">
+              <img 
+                src="https://image.pollinations.ai/prompt/person%20using%20hand%20gesture%20recognition%20software%20on%20computer%20screen%20dark%20room%20cyan%20ambient%20light%20realistic%20photography?width=800&height=450&nologo=true&seed=202" 
+                alt="Person using AI Hand Recognition" 
+                className="rounded-[2rem] w-full object-cover aspect-video opacity-90 group-hover:opacity-100 transition-opacity"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 group-hover:scale-110 transition-transform cursor-pointer">
+                  <Play fill="white" size={32} className="ml-1" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="text-center mb-16">
+          <h3 className="text-3xl font-black text-white mb-4">Skenario Penggunaan Nyata</h3>
+          <p className="text-slate-400 max-w-2xl mx-auto">Lihat bagaimana AlphaBrain menjembatani hambatan komunikasi di berbagai situasi sehari-hari.</p>
+        </div>
+
+        <div className="space-y-24 mb-32">
+          {/* Scenario 1: Medical */}
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            <div className="flex-1 space-y-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-widest">
+                Instansi Kesehatan
+              </div>
+              <h4 className="text-3xl font-bold text-white">Komunikasi Pasien-Dokter yang Mandiri</h4>
+              <p className="text-slate-300 leading-relaxed">
+                Bayangkan seorang pasien Tuli datang ke IGD tanpa pendamping. Dengan AlphaBrain yang terpasang di tablet rumah sakit, pasien dapat memberikan isyarat "Sakit", "Sesak Nafas", atau "Alergi" yang langsung diterjemahkan menjadi teks untuk perawat.
+              </p>
+              <ul className="space-y-3">
+                <li className="flex items-center gap-3 text-slate-400 text-sm">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Mengurangi risiko salah diagnosis karena kendala bahasa.
+                </li>
+                <li className="flex items-center gap-3 text-slate-400 text-sm">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Memberikan privasi penuh bagi pasien tanpa harus selalu bergantung pada pihak ketiga.
+                </li>
+              </ul>
+            </div>
+            <div className="flex-1 relative">
+              <div className="absolute inset-0 bg-emerald-500/10 blur-[80px] rounded-full" />
+              <div className="relative glass-strong p-3 rounded-[2rem] border border-white/5 shadow-2xl overflow-hidden aspect-video">
+                <img 
+                  src="https://image.pollinations.ai/prompt/doctor%20using%20tablet%20to%20communicate%20with%20deaf%20patient%20hospital%20emergency%20room%20warm%20professional%20lighting%20realistic%20photography?width=800&height=450&nologo=true&seed=303" 
+                  alt="Doctor using AI to communicate with deaf patient" 
+                  className="w-full h-full object-cover rounded-[1.5rem] opacity-85"
+                  loading="lazy"
+                />
+                <div className="absolute bottom-6 left-6 right-6 p-4 glass rounded-xl border border-white/10">
+                  <p className="text-xs font-bold text-white mb-1">AI Output: "SAYA SESAK NAFAS"</p>
+                  <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                    <div className="w-[92%] h-full bg-emerald-500" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Scenario 2: Education */}
+          <div className="flex flex-col lg:flex-row-reverse items-center gap-12">
+            <div className="flex-1 space-y-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold uppercase tracking-widest">
+                Sektor Pendidikan
+              </div>
+              <h4 className="text-3xl font-bold text-white">Belajar Bahasa Isyarat dengan Feedback Instan</h4>
+              <p className="text-slate-300 leading-relaxed">
+                Di sekolah inklusi, siswa umum seringkali kesulitan mempraktikkan isyarat tangan karena tidak tahu apakah gerakan mereka sudah benar. AlphaBrain bertindak sebagai "Tutor AI" yang memberikan koreksi posisi jari secara real-time.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 glass rounded-2xl border border-white/5">
+                  <p className="text-xl font-bold text-white mb-1">98%</p>
+                  <p className="text-[10px] text-slate-500 uppercase font-black">Akurasi Belajar</p>
+                </div>
+                <div className="p-4 glass rounded-2xl border border-white/5">
+                  <p className="text-xl font-bold text-white mb-1">0.1s</p>
+                  <p className="text-[10px] text-slate-500 uppercase font-black">Respon Koreksi</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 relative">
+              <div className="absolute inset-0 bg-purple-500/10 blur-[80px] rounded-full" />
+              <div className="relative glass-strong p-3 rounded-[2rem] border border-white/5 shadow-2xl overflow-hidden aspect-video">
+                <img 
+                  src="https://image.pollinations.ai/prompt/student%20practicing%20sign%20language%20in%20modern%20classroom%20with%20digital%20screen%20showing%20hand%20tracking%20points%20realistic%20photography?width=800&height=450&nologo=true&seed=404" 
+                  alt="Student learning sign language with AI tutor" 
+                  className="w-full h-full object-cover rounded-[1.5rem] opacity-85"
+                  loading="lazy"
+                />
+                <div className="absolute top-6 right-6 p-4 glass rounded-xl border border-purple-500/30">
+                  <div className="flex items-center gap-2 text-purple-400 font-bold text-xs mb-1">
+                    <Zap size={14} /> POSISI JARI BENAR
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Scenario 3: Smart Home */}
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            <div className="flex-1 space-y-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold uppercase tracking-widest">
+                Teknologi Masa Depan
+              </div>
+              <h4 className="text-3xl font-bold text-white">Kontrol Rumah Pintar Melalui Isyarat</h4>
+              <p className="text-slate-300 leading-relaxed">
+                Membantu lansia atau penyandang disabilitas motorik mengontrol lingkungan mereka. Cukup dengan isyarat "L" untuk Lampu atau "K" untuk Kipas, sistem akan mengirimkan sinyal ke perangkat IoT di rumah.
+              </p>
+              <div className="flex items-center gap-4 p-4 glass-strong rounded-2xl border border-cyan-500/20">
+                <div className="p-2 bg-cyan-500/20 rounded-lg text-cyan-400"><Settings size={20} /></div>
+                <p className="text-sm text-slate-300 font-medium">Bisa dikoneksikan ke Google Home atau Alexa melalui API.</p>
+              </div>
+            </div>
+            <div className="flex-1 relative">
+              <div className="absolute inset-0 bg-cyan-500/10 blur-[80px] rounded-full" />
+              <div className="relative glass-strong p-3 rounded-[2rem] border border-white/5 shadow-2xl overflow-hidden aspect-video">
+                <img 
+                  src="https://image.pollinations.ai/prompt/elderly%20person%20controlling%20smart%20home%20lights%20with%20hand%20gestures%20modern%20cozy%20living%20room%20warm%20lighting%20realistic%20photography?width=800&height=450&nologo=true&seed=505" 
+                  alt="Smart home control with hand gestures" 
+                  className="w-full h-full object-cover rounded-[1.5rem] opacity-85"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="px-6 py-3 glass-strong rounded-full border border-cyan-500/50 text-cyan-400 font-bold animate-pulse">
+                    MENU: KONTROL LAMPU
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-20 glass-strong p-12 rounded-[3rem] border border-white/10 text-center relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 blur-[100px] rounded-full" />
+          <div className="relative z-10">
+            <h3 className="text-3xl font-black text-white mb-4">Siap untuk mencoba?</h3>
+            <p className="text-slate-300 mb-10 max-w-xl mx-auto font-light">Mulai latih AI Anda sekarang. Tidak perlu install aplikasi, semua berjalan di browser Anda.</p>
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <button onClick={() => navigateTo('detector-letter')} className="px-8 py-4 bg-white text-slate-900 font-bold rounded-2xl hover:scale-105 transition-transform">Buka Studio AI</button>
+              <button onClick={() => navigateTo('guide')} className="px-8 py-4 glass border border-white/10 text-white font-bold rounded-2xl hover:bg-white/5 transition-all">Lihat Panduan Isyarat</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ===================== GUIDE PAGE =====================
   const GuidePage = () => (
     <div className="animate-fade-up w-full max-w-7xl mx-auto px-4 pb-20">
       {/* Hero Banner for Guide */}
       <div className="relative rounded-[2.5rem] overflow-hidden mb-16 glass-strong border border-white/10">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-900/40 via-cyan-900/40 to-blue-900/40" />
-        <div className="absolute right-0 top-0 w-1/2 h-full bg-[url('https://images.unsplash.com/photo-1579227114347-15d08fc37cae?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80')] bg-cover bg-center opacity-20 mix-blend-overlay" />
+        <div className="absolute right-0 top-0 w-1/2 h-full bg-[url('https://image.pollinations.ai/prompt/hand%20sign%20language%20dictionary%20open%20book%20with%20holographic%20hand%20tracking%20points%20futuristic%20interface%20dark%20background?width=1000&height=600&nologo=true&seed=606')] bg-cover bg-center opacity-20 mix-blend-overlay" />
         <div className="relative p-10 md:p-16 flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="text-left max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 mb-6">
@@ -604,7 +855,7 @@ function App() {
   );
 
   // ===================== DETECTOR PAGE =====================
-  const DetectorPage = (mode: mlEngine.MLMode) => (
+  const DetectorPage = ({ mode }: { mode: mlEngine.MLMode }) => (
     <div className="animate-scale-in">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
@@ -946,6 +1197,9 @@ function App() {
           <button onClick={() => navigateTo('guide')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${currentPage === 'guide' ? 'text-white bg-white/5' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
             Panduan Library
           </button>
+          <button onClick={() => navigateTo('example')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${currentPage === 'example' ? 'text-white bg-white/5' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}>
+            Contoh & Info
+          </button>
           <div className="flex gap-1 ml-2 bg-slate-800/50 p-1 rounded-2xl border border-slate-700/50 shadow-inner">
             <button 
               onClick={() => { navigateTo('detector-letter'); updateMlState({ activeMode: 'letter', trainingLetter: 'A' }); updateSampleCounts('letter'); }} 
@@ -965,10 +1219,11 @@ function App() {
 
       {/* Content */}
       <main className="relative z-10 max-w-7xl mx-auto py-10 px-6">
-        {currentPage === 'home' && LandingPage()}
-        {currentPage === 'guide' && GuidePage()}
-        {currentPage === 'detector-letter' && DetectorPage('letter')}
-        {currentPage === 'detector-word' && DetectorPage('word')}
+        {currentPage === 'home' && <LandingPage />}
+        {currentPage === 'guide' && <GuidePage />}
+        {currentPage === 'example' && <ExamplePage />}
+        {currentPage === 'detector-letter' && <DetectorPage mode="letter" />}
+        {currentPage === 'detector-word' && <DetectorPage mode="word" />}
       </main>
 
       {/* Footer */}
