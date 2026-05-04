@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Webcam from 'react-webcam';
 import * as HandsNS from '@mediapipe/hands';
-import * as drawingUtils from '@mediapipe/drawing_utils';
+import * as drawingUtilsNS from '@mediapipe/drawing_utils';
 
 // Robust Hands constructor resolution
 const getHands = () => {
@@ -10,6 +10,15 @@ const getHands = () => {
   if ((HandsNS as any).default?.Hands) return (HandsNS as any).default.Hands;
   if ((HandsNS as any).default) return (HandsNS as any).default;
   return HandsNS;
+};
+
+// Robust DrawingUtils resolution
+const getDrawingUtils = () => {
+  const globalUtils = (window as any).drawing_utils || (window as any).drawingUtils;
+  if (globalUtils) return globalUtils;
+  if ((drawingUtilsNS as any).drawConnectors) return drawingUtilsNS;
+  if ((drawingUtilsNS as any).default?.drawConnectors) return (drawingUtilsNS as any).default;
+  return drawingUtilsNS;
 };
 type Results = HandsNS.Results;
 import { 
@@ -264,8 +273,13 @@ function App() {
       const landmarks = results.multiHandLandmarks[0];
       const handedness = results.multiHandedness[0].label; // "Left" atau "Right"
 
-      drawingUtils.drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: '#06b6d4', lineWidth: 3 });
-      drawingUtils.drawLandmarks(ctx, landmarks, { color: '#a855f7', lineWidth: 1, radius: 3 });
+      const utils = getDrawingUtils();
+      if (utils.drawConnectors) {
+        utils.drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { color: '#06b6d4', lineWidth: 3 });
+      }
+      if (utils.drawLandmarks) {
+        utils.drawLandmarks(ctx, landmarks, { color: '#a855f7', lineWidth: 1, radius: 3 });
+      }
       
       const mlParams = mlStudioRef.current;
       
