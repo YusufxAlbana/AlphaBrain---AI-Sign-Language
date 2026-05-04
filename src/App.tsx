@@ -1,26 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import Webcam from 'react-webcam';
-import * as HandsNS from '@mediapipe/hands';
-import * as drawingUtilsNS from '@mediapipe/drawing_utils';
 
-// Robust Hands constructor resolution
-const getHands = () => {
-  if (typeof (window as any).Hands === 'function') return (window as any).Hands;
-  if ((HandsNS as any).Hands) return (HandsNS as any).Hands;
-  if ((HandsNS as any).default?.Hands) return (HandsNS as any).default.Hands;
-  if ((HandsNS as any).default) return (HandsNS as any).default;
-  return HandsNS;
+// MediaPipe is loaded via CDN in index.html as global scripts.
+// DO NOT import from npm - it cannot be bundled correctly by Vite.
+// Access via window globals set by the CDN scripts.
+
+// Type-only import for TypeScript hints (stripped at compile time)
+import type { Results } from '@mediapipe/hands';
+
+const getHands = (): any => {
+  return (window as any).Hands;
 };
 
-// Robust DrawingUtils resolution
 const getDrawingUtils = () => {
-  const globalUtils = (window as any).drawing_utils || (window as any).drawingUtils;
-  if (globalUtils) return globalUtils;
-  if ((drawingUtilsNS as any).drawConnectors) return drawingUtilsNS;
-  if ((drawingUtilsNS as any).default?.drawConnectors) return (drawingUtilsNS as any).default;
-  return drawingUtilsNS;
+  // CDN exposes drawConnectors / drawLandmarks directly on window
+  return window as any;
 };
-type Results = HandsNS.Results;
+
 import { 
   Camera, 
   MessageSquare, 

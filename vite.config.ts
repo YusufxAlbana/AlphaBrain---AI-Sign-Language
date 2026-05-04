@@ -10,11 +10,14 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['@tensorflow/tfjs', '@tensorflow-models/knn-classifier', '@mediapipe/hands', '@mediapipe/drawing_utils'],
+    // Only bundle TensorFlow - MediaPipe is loaded from CDN
+    include: ['@tensorflow/tfjs', '@tensorflow-models/knn-classifier'],
+    exclude: ['@mediapipe/hands', '@mediapipe/drawing_utils', '@mediapipe/camera_utils'],
   },
   build: {
-    commonjsOptions: {
-      include: [/node_modules/],
+    rollupOptions: {
+      // Treat MediaPipe packages as external - they come from CDN
+      external: ['@mediapipe/hands', '@mediapipe/drawing_utils', '@mediapipe/camera_utils'],
     },
   },
 })
