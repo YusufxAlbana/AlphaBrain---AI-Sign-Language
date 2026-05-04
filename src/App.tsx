@@ -3,9 +3,14 @@ import Webcam from 'react-webcam';
 import * as HandsNS from '@mediapipe/hands';
 import * as drawingUtils from '@mediapipe/drawing_utils';
 
-// Fix for Mediapipe constructor in Vite production builds
-// Fix for Mediapipe constructor in Vite production builds
-const Hands = (HandsNS as any).Hands || (HandsNS as any).default?.Hands || (HandsNS as any).default || HandsNS;
+// Robust Hands constructor resolution
+const getHands = () => {
+  if (typeof (window as any).Hands === 'function') return (window as any).Hands;
+  if ((HandsNS as any).Hands) return (HandsNS as any).Hands;
+  if ((HandsNS as any).default?.Hands) return (HandsNS as any).default.Hands;
+  if ((HandsNS as any).default) return (HandsNS as any).default;
+  return HandsNS;
+};
 type Results = HandsNS.Results;
 import { 
   Camera, 
@@ -200,7 +205,8 @@ function App() {
     let isRunning = true;
     let animationFrameId: number;
 
-    const hands = new Hands({
+    const HandsConstructor = getHands();
+    const hands = new (HandsConstructor as any)({
       locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424515/${file}`,
     });
 

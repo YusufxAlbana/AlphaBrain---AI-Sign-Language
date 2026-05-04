@@ -11,5 +11,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['@tensorflow/tfjs', '@tensorflow-models/knn-classifier'],
+    exclude: ['@mediapipe/hands', '@mediapipe/drawing_utils']
+  },
+  build: {
+    commonjsOptions: {
+      include: [/@tensorflow/, /node_modules/],
+    },
   },
 })
