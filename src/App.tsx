@@ -84,6 +84,8 @@ function App() {
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [frameCount, setFrameCount] = useState(0);
   const lastTypedLetterRef = useRef<string>("");
+  // Output hanya ditampilkan setelah user pertama kali menekan tombol rekam
+  const [hasRecordedOnce, setHasRecordedOnce] = useState(false);
 
   const navigateTo = (page: Page) => {
     setCurrentPage(page);
@@ -211,8 +213,14 @@ function App() {
     let animationFrameId: number;
 
     const HandsConstructor = getHands();
+    if (!HandsConstructor) {
+      console.error('MediaPipe Hands tidak tersedia. Pastikan script CDN sudah dimuat.');
+      setIsModelLoading(false);
+      return;
+    }
     const hands = new (HandsConstructor as any)({
-      locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424515/${file}`,
+      // Gunakan file lokal dari folder /public/hands/ agar tidak bergantung pada CDN versioned
+      locateFile: (file: string) => `/hands/${file}`,
     });
 
     hands.setOptions({
@@ -944,11 +952,20 @@ function App() {
               </div>
             </div>
 
-            {/* Current Letter Badge */}
-            {currentLetter && (
+            {/* Current Letter Badge - hanya muncul setelah user merekam */}
+            {hasRecordedOnce && currentLetter && (
               <div className="absolute bottom-6 right-6">
                 <div className="w-auto min-w-[5rem] h-20 px-6 rounded-2xl glass neon-border flex items-center justify-center animate-letter-pop">
                   <span className="text-4xl font-black text-cyan-400">{currentLetter}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Prompt sebelum rekaman pertama */}
+            {!hasRecordedOnce && (
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+                <div className="px-5 py-2.5 rounded-2xl glass border border-purple-500/30 text-center">
+                  <p className="text-xs font-bold text-purple-300">Tahan tombol <span className="text-white">REKAM</span> untuk mulai</p>
                 </div>
               </div>
             )}
@@ -957,8 +974,8 @@ function App() {
             <div className="absolute inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" style={{ animation: 'scan-line 4s linear infinite' }} />
           </div>
           
-          {/* Progress Bar */}
-          {currentLetter && (
+          {/* Progress Bar - hanya muncul setelah user merekam */}
+          {hasRecordedOnce && currentLetter && (
             <div className="relative h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-gradient-to-r from-cyan-500 to-purple-500 transition-all duration-100 ease-linear rounded-full"
@@ -970,7 +987,8 @@ function App() {
 
         {/* Output Panel - 2 cols */}
         <div className="lg:col-span-2 flex flex-col gap-5">
-          {/* Main Output */}
+          {/* Main Output - hanya tampil setelah rekaman pertama */}
+          {hasRecordedOnce ? (
           <div className="relative flex-1 p-8 rounded-[2rem] glass-strong overflow-hidden">
             {/* Decorative gradient */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-3xl rounded-full pointer-events-none" />
@@ -1003,6 +1021,18 @@ function App() {
               </div>
             </div>
           </div>
+          ) : (
+          <div className="relative flex-1 p-8 rounded-[2rem] glass-strong overflow-hidden flex flex-col items-center justify-center text-center gap-4">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 blur-3xl rounded-full pointer-events-none" />
+            <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-purple-500/30 flex items-center justify-center mb-2">
+              <PlayCircle size={28} className="text-purple-400" />
+            </div>
+            <p className="text-base font-bold text-slate-400">Output akan muncul di sini</p>
+            <p className="text-xs text-slate-600 max-w-[200px] leading-relaxed">
+              Arahkan tangan ke kamera, lalu tekan dan tahan tombol <span className="text-purple-400 font-bold">REKAM</span> untuk mulai merekam posisi tangan.
+            </p>
+          </div>
+          )}
 
           {/* Tip Card */}
           <div className="p-5 rounded-2xl glass neon-border-purple">
@@ -1121,7 +1151,7 @@ function App() {
                   </div>
                   <button 
                     className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition-all ${mlState.isRecording ? 'bg-red-500 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_10px_rgba(147,51,234,0.3)]'}`}
-                    onMouseDown={() => { updateMlState({ isStudioMode: true, isRecording: true }); }}
+                    onMouseDown={() => { updateMlState({ isStudioMode: true, isRecording: true }); setHasRecordedOnce(true); }}
                     onMouseUp={() => { updateMlState({ isRecording: false }); updateSampleCounts(); mlEngine.saveDatasetToStorage(mode); }}
                     onMouseLeave={() => { updateMlState({ isRecording: false }); updateSampleCounts(); mlEngine.saveDatasetToStorage(mode); }}
                   >
@@ -1230,12 +1260,14 @@ function App() {
       </nav>
 
       {/* Content */}
+      {/* PENTING: Semua halaman dipanggil sebagai fungsi biasa, bukan JSX komponen.
+          Ini mencegah React unmount+remount Webcam setiap kali App re-render (tiap frame). */}
       <main className="relative z-10 max-w-7xl mx-auto py-10 px-6">
-        {currentPage === 'home' && <LandingPage />}
-        {currentPage === 'guide' && <GuidePage />}
-        {currentPage === 'example' && <ExamplePage />}
-        {currentPage === 'detector-letter' && <DetectorPage mode="letter" />}
-        {currentPage === 'detector-word' && <DetectorPage mode="word" />}
+        {currentPage === 'home' && LandingPage()}
+        {currentPage === 'guide' && GuidePage()}
+        {currentPage === 'example' && ExamplePage()}
+        {currentPage === 'detector-letter' && DetectorPage({ mode: 'letter' })}
+        {currentPage === 'detector-word' && DetectorPage({ mode: 'word' })}
       </main>
 
       {/* Footer */}
