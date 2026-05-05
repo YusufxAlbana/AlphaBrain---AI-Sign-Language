@@ -1,11 +1,21 @@
 {
+  "headers": [
+    {
+      "source": "/hands/(.*\\.wasm)",
+      "headers": [{"key": "Content-Type", "value": "application/wasm"}]
+    }
+  ],
   "routes": [
+    {
+      "src": "/hands/(.*)",
+      "dest": "/hands/$1"
+    },
     {
       "src": "/assets/(.*)",
       "dest": "/assets/$1"
     },
     {
-      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|json))",
+      "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|json|wasm|data|tflite|binarypb))",
       "dest": "/$1"
     },
     {
